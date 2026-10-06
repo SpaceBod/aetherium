@@ -11,7 +11,7 @@
 <a href="https://fabricmc.net"><img src="https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/compact/supported/fabric_vector.svg" alt="Supported on Fabric" height="40"></a>
 <a href="https://neoforged.net"><img src="https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/compact/supported/neoforge_vector.svg" alt="Supported on NeoForge" height="40"></a>
 
-**Shader packs on Minecraft's Vulkan renderer.**
+## Shader packs on Minecraft's Vulkan renderer
 
 A client-side mod that runs standard shader packs natively on Vulkan, with its own shader-engine optimisations,
 a searchable settings screen and a few quality-of-life extras.
