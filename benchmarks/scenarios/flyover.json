@@ -1,0 +1,27 @@
+{
+  "id": "flyover",
+  "description": "Chunk streaming over existing terrain. Fly east at elytra speed (32 blocks/s) for 40 s; chunks come from disk, so this measures client ingest, meshing and uploads, not worldgen.",
+  "world": "overworld-a",
+  "renderDistance": 16,
+  "simulationDistance": 8,
+  "fov": 70,
+  "timeOfDay": 6000,
+  "start": "settled",
+  "warmupSeconds": 3,
+  "pregenerate": true,
+  "path": [
+    {
+      "t": 0,
+      "dy": 60,
+      "yaw": -90,
+      "pitch": 20
+    },
+    {
+      "t": 40,
+      "dx": 1280,
+      "dy": 60,
+      "yaw": -90,
+      "pitch": 20
+    }
+  ]
+}

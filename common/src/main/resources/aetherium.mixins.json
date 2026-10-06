@@ -1,0 +1,18 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "dev.spacebod.aetherium.mixin",
+	"plugin": "dev.spacebod.aetherium.core.AetheriumMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"opt.mem.component_patch.PatchedDataComponentMapMixin",
+		"opt.mem.palette_lock.PalettedContainerMixin",
+		"opt.mem.state_cache_dedup.ArrayVoxelShapeAccessor",
+		"opt.mem.state_cache_dedup.BlockStateBaseMixin",
+		"opt.mem.state_cache_dedup.BlockStateCacheMixin",
+		"opt.mem.state_cache_dedup.VoxelShapeAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

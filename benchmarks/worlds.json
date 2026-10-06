@@ -1,0 +1,6 @@
+{
+  "overworld-a": {
+    "seed": 20260927,
+    "description": "Default overworld preset, structures on, peaceful, spectator. Anchor = spawn column at surface height."
+  }
+}

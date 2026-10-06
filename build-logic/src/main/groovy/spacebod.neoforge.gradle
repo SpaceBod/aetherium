@@ -1,0 +1,77 @@
+// The NeoForge jar: neoforge/src (the @Mod classes, event wiring, neoforge.mods.toml) compiled together
+// with the shared common/src sources. NeoForge has no split source sets, so common's main and client
+// code both go into the one source set here; client-only classes simply never load on a server.
+plugins {
+	id 'spacebod.base'
+	id 'net.neoforged.moddev'
+}
+
+version = "${project.mod_version}+mc${mcSeries}-neoforge"
+
+neoForge {
+	version = project.neoforge_version
+
+	runs {
+		client {
+			client()
+			gameDirectory = project.file(runDirName)
+		}
+		server {
+			server()
+			gameDirectory = project.file("${runDirName}/server")
+			programArgument '--nogui'
+		}
+	}
+
+	mods {
+		"${project.mod_id}" {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+// ModDevGradle's asset download (needed by runClient) otherwise insists on
+// a Java 21 toolchain; run it on the same JDK 25 as everything else.
+tasks.withType(net.neoforged.nfrtgradle.NeoFormRuntimeTask).configureEach {
+	javaExecutable = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+			.map { it.executablePath.asFile.absolutePath }
+}
+
+dependencies {
+	// Required by the mod metadata, so dev runs need it on the classpath too.
+	runtimeOnly "maven.modrinth:sodium:${project.sodium_version}-neoforge"
+	// Only so the IDE sees common's classes; the sources themselves are compiled in below.
+	compileOnly(project(':common')) {
+		attributes { attribute(loaderAttribute, 'common') }
+	}
+	compileOnly(project(':common')) {
+		attributes { attribute(loaderAttribute, 'common') }
+		capabilities { requireFeature('client') }
+	}
+}
+
+tasks.named('compileJava', JavaCompile) { source(commonSrc('main', 'java') + commonSrc('client', 'java')) }
+tasks.named('processResources', ProcessResources) { from(commonSrc('main', 'resources') + commonSrc('client', 'resources')) }
+tasks.named('sourcesJar', Jar) {
+	from(commonSrc('main', 'java') + commonSrc('client', 'java'))
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+processResources {
+	def version = project.version
+	// Maven-style ranges: the Minecraft series, "[26.3,26.4)", and NeoForge from the version built against up to the
+	// next series (NeoForge versions follow Minecraft's).
+	def minecraftRange = "[${mcSeries},${mcNextSeries})"
+	def neoforgeRange = "[${project.neoforge_version},${mcNextSeries})"
+	def sodiumRange = "[${project.sodium_min},)"
+	inputs.property 'version', version
+	inputs.property 'minecraftRange', minecraftRange
+	inputs.property 'neoforgeRange', neoforgeRange
+	inputs.property 'sodiumRange', sodiumRange
+
+	filesMatching('META-INF/neoforge.mods.toml') {
+		expand 'version': version, 'minecraft_range': minecraftRange, 'neoforge_range': neoforgeRange, 'sodium_range': sodiumRange
+	}
+}
+
+markLoader('neoforge')

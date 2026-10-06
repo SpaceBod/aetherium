@@ -1,0 +1,65 @@
+plugins {
+	id 'spacebod.fabric'
+}
+
+loom {
+	runs {
+		client {
+			// Fixed heap so benchmark runs are comparable (benchmarks/README.md). The benchmark runner
+			// passes window size and graphics backend as program arguments. AETHERIUM_HEAP=8G overrides it
+			// (benchmarks/run.sh on macOS, where the heap shares unified memory with the GPU).
+			def heap = System.getenv('AETHERIUM_HEAP') ?: '16G'
+			vmArg "-Xms${heap}"
+			vmArg "-Xmx${heap}"
+			// AETHERIUM_JFR=<file.jfr>: record a CPU/allocation profile of the whole session.
+			def jfr = System.getenv('AETHERIUM_JFR')
+			if (jfr) {
+				vmArg "-XX:StartFlightRecording=filename=${jfr},settings=profile"
+			}
+			// AETHERIUM_JVM_ARGS="-Dmax.bg.threads=4 ...": extra JVM flags, e.g. to emulate a smaller CPU.
+			def extraJvm = System.getenv('AETHERIUM_JVM_ARGS')
+			if (extraJvm) {
+				extraJvm.tokenize(' ').each { vmArg it }
+			}
+			// -PclientArgs="--graphicsBackend vulkan --width 1920 --height 1080" (benchmarks/run.ps1)
+			def clientArgs = project.findProperty('clientArgs')
+			if (clientArgs) {
+				programArgs(clientArgs.toString().tokenize(' ') as String[])
+			}
+		}
+	}
+}
+
+// Shader-pack stack libraries (spacebod.base), jar-in-jar.
+dependencies {
+	shaderLibraries.each {
+		implementation it
+		include it
+	}
+}
+
+addLodCompileOnly()
+addTerrainRendererCompileOnly()
+
+// Development tooling (common/src/dev: benchmark driver, instrumentation mixins), loaded as a second mod
+// (aetherium_dev) in dev runs only. The release jar is built from main and client and never contains it.
+sourceSets {
+	dev {
+		compileClasspath += main.compileClasspath + client.compileClasspath + main.output + client.output
+		runtimeClasspath += main.runtimeClasspath + client.runtimeClasspath + main.output + client.output
+	}
+}
+tasks.named('compileDevJava', JavaCompile) { source(commonSrc('dev', 'java')) }
+tasks.named('processDevResources', ProcessResources) { from(commonSrc('dev', 'resources')) }
+loom {
+	mods {
+		aetherium_dev {
+			sourceSet sourceSets.dev
+		}
+	}
+	runs {
+		client {
+			source sourceSets.dev
+		}
+	}
+}

@@ -1,0 +1,139 @@
+package dev.spacebod.aetherium.shaders.shaderpack.properties;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import dev.spacebod.aetherium.shaders.AetheriumShaders;
+import dev.spacebod.aetherium.shaders.gl.ShaderLimits;
+import dev.spacebod.aetherium.shaders.gl.texture.InternalTextureFormat;
+import dev.spacebod.aetherium.shaders.shaderpack.parsing.DirectiveHolder;
+import org.joml.Vector4f;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+public class PackRenderTargetDirectives {
+	public static final ImmutableList<String> LEGACY_RENDER_TARGETS = ImmutableList.of(
+		"gcolor",
+		"gdepth",
+		"gnormal",
+		"composite",
+		"gaux1",
+		"gaux2",
+		"gaux3",
+		"gaux4"
+	);
+
+	/** Every colour target index a pack may declare settings for (colortex0 up to the engine's limit). */
+	public static final Set<Integer> BASELINE_SUPPORTED_RENDER_TARGETS;
+
+	static {
+		ImmutableSet.Builder<Integer> builder = ImmutableSet.builder();
+
+		for (int i = 0; i < ShaderLimits.MAX_COLOR_BUFFERS; i++) {
+			builder.add(i);
+		}
+
+		BASELINE_SUPPORTED_RENDER_TARGETS = builder.build();
+	}
+
+	private final Int2ObjectMap<RenderTargetSettings> renderTargetSettings;
+
+	PackRenderTargetDirectives(Set<Integer> supportedRenderTargets) {
+		this.renderTargetSettings = new Int2ObjectOpenHashMap<>();
+
+		supportedRenderTargets.forEach(
+			(index) -> renderTargetSettings.put(index.intValue(), new RenderTargetSettings()));
+	}
+
+	public Map<Integer, RenderTargetSettings> getRenderTargetSettings() {
+		return Collections.unmodifiableMap(renderTargetSettings);
+	}
+
+	public void acceptDirectives(DirectiveHolder directives) {
+		Optional.ofNullable(renderTargetSettings.get(7)).ifPresent(colortex7 -> {
+			// Legacy GAUX4FORMAT comment directive
+			directives.acceptCommentStringDirective("GAUX4FORMAT", format -> {
+				switch (format) {
+					case "RGBA32F" -> colortex7.requestedFormat = InternalTextureFormat.RGBA32F;
+					case "RGB32F" -> colortex7.requestedFormat = InternalTextureFormat.RGB32F;
+					case "RGB16" -> colortex7.requestedFormat = InternalTextureFormat.RGB16;
+					case null, default ->
+						AetheriumShaders.logger.warn("Ignoring GAUX4FORMAT directive /* GAUX4FORMAT:" + format + "*/ because " + format
+							+ " must be RGBA32F, RGB32F, or RGB16. Use `const int colortex7Format = " + format + ";` + instead.");
+				}
+			});
+		});
+
+		// Declaring a gdepth uniform (even unsampled or of the wrong type) upgrades gdepth/colortex1 from RGBA to RGBA32F.
+		Optional.ofNullable(renderTargetSettings.get(1)).ifPresent(gdepth -> directives.acceptUniformDirective("gdepth", () -> {
+			if (gdepth.requestedFormat == InternalTextureFormat.RGBA) {
+				gdepth.requestedFormat = InternalTextureFormat.RGBA32F;
+			}
+		}));
+
+		renderTargetSettings.forEach((index, settings) -> {
+			acceptBufferDirectives(directives, settings, "colortex" + index);
+
+			if (index < LEGACY_RENDER_TARGETS.size()) {
+				acceptBufferDirectives(directives, settings, LEGACY_RENDER_TARGETS.get(index));
+			}
+		});
+	}
+
+	private void acceptBufferDirectives(DirectiveHolder directives, RenderTargetSettings settings, String bufferName) {
+		directives.acceptConstStringDirective(bufferName + "Format", format -> {
+			Optional<InternalTextureFormat> internalFormat = InternalTextureFormat.fromString(format);
+
+			if (internalFormat.isPresent()) {
+				settings.requestedFormat = internalFormat.get();
+			} else {
+				AetheriumShaders.logger.warn("Unrecognized internal texture format " + format + " specified for " + bufferName + "Format, ignoring.");
+			}
+		});
+
+		// Read from every program, though only composite and deferred passes clear.
+		directives.acceptConstBooleanDirective(bufferName + "Clear",
+			shouldClear -> settings.clear = shouldClear);
+
+		// Relevant even when clear is false: it is the buffer's initial colour.
+		directives.acceptConstVec4Directive(bufferName + "ClearColor",
+			clearColor -> settings.clearColor = clearColor);
+	}
+
+	public static final class RenderTargetSettings {
+		private InternalTextureFormat requestedFormat;
+		private boolean clear;
+		private Vector4f clearColor;
+
+		public RenderTargetSettings() {
+			this.requestedFormat = InternalTextureFormat.RGBA;
+			this.clear = true;
+			this.clearColor = null;
+		}
+
+		public InternalTextureFormat getInternalFormat() {
+			return requestedFormat;
+		}
+
+		public boolean shouldClear() {
+			return clear;
+		}
+
+		public Optional<Vector4f> getClearColor() {
+			return Optional.ofNullable(clearColor);
+		}
+
+		@Override
+		public String toString() {
+			return "RenderTargetSettings{" +
+				"requestedFormat=" + requestedFormat +
+				", clear=" + clear +
+				", clearColor=" + clearColor +
+				'}';
+		}
+	}
+}

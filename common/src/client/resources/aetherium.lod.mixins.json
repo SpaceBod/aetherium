@@ -1,0 +1,14 @@
+{
+	"required": false,
+	"minVersion": "0.8",
+	"package": "dev.spacebod.aetherium.client.mixin.compat.lod",
+	"plugin": "dev.spacebod.aetherium.shaders.compat.lod.LodMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"LodClientApiMixin",
+		"LodFarFadeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}

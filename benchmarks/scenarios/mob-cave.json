@@ -1,0 +1,58 @@
+{
+  "id": "mob-cave",
+  "description": "Hidden entities: mob-field's 200 motionless mobs in a sealed air pocket 30 blocks underground. The camera settles inside the pocket looking at them (their sections get built), then jumps to the surface and looks down at the ground above them for the measured window: all in the view cone, all hidden by terrain. Measures entity occlusion culling (cull.entities); vanilla never draws entities in sections it has not built, so the mobs must be seen first.",
+  "world": "overworld-a",
+  "renderDistance": 16,
+  "simulationDistance": 8,
+  "fov": 70,
+  "timeOfDay": 6000,
+  "start": "settled",
+  "warmupSeconds": 3,
+  "pregenerate": false,
+  "mobs": {
+    "types": [
+      "husk",
+      "spider",
+      "cow",
+      "sheep",
+      "villager",
+      "pig",
+      "chicken",
+      "creeper",
+      "horse",
+      "wolf"
+    ],
+    "rows": 10,
+    "columns": 20,
+    "spacing": 1.5,
+    "distance": 10,
+    "yaw": 0,
+    "underground": 30
+  },
+  "path": [
+    {
+      "t": 0,
+      "dy": -29,
+      "yaw": 0,
+      "pitch": 15
+    },
+    {
+      "t": 1.9,
+      "dy": -29,
+      "yaw": 0,
+      "pitch": 15
+    },
+    {
+      "t": 2.0,
+      "dy": 0,
+      "yaw": 0,
+      "pitch": 55
+    },
+    {
+      "t": 17,
+      "dy": 0,
+      "yaw": 0,
+      "pitch": 55
+    }
+  ]
+}

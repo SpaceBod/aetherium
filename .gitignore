@@ -1,0 +1,63 @@
+# Gradle / build
+.gradle/
+.kotlin/
+build/
+*/build/
+out/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.fleet/
+.settings/
+.project
+.classpath
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local tooling
+.claude/
+.venv/
+__pycache__/
+*.pyc
+
+# Logs and JVM crash dumps
+*.log
+logs/
+hs_err_pid*
+replay_pid*
+
+# Game run directories (Loom/NeoForge runs, the vanilla comparison game dir)
+run/
+*/run/
+runs/
+/fabric/run-vanilla/
+
+# Shader packs (downloaded by benchmarks/tools/fetch-packs.sh or added by hand) and their settings files, wherever a
+# game directory keeps them
+shaderpacks/
+
+# Other game output, wherever a game directory is (including the game-free harness, which uses common/ as one)
+crash-reports/
+screenshots/
+shader-dump/
+/common/aetherium/
+/common/config/
+
+# Third-party jars for compatibility work (benchmarks/tools/build-lod.sh)
+/libs/
+
+# Reference clones for study (never committed)
+/reference/
+
+# Benchmark golden worlds (large, re-created by benchmarks/run.ps1 -Prepare), raw run results and rendered reports
+/benchmarks/worlds/
+/benchmarks/results/
+/benchmarks/reports/

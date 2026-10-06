@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: FAQ and troubleshooting
+    url: https://github.com/SpaceBod/aetherium/blob/main/docs/faq.md
+    about: Shader packs doing nothing, Vulkan problems, low frame rate and other common questions.
+  - name: Shader pack compatibility
+    url: https://github.com/SpaceBod/aetherium/blob/main/docs/compatibility.md
+    about: Which packs have been tested, and known differences.

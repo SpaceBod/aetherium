@@ -1,0 +1,89 @@
+name: Performance issue
+description: Low frame rate, stutter, long pack loads or high memory use.
+title: "[Performance] <short description>"
+labels: ["performance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The [FAQ](https://github.com/SpaceBod/aetherium/blob/main/docs/faq.md#low-frame-rate-with-a-pack) lists the
+        settings that help most. Numbers make a performance report useful: frame rate with and without the pack, or
+        with Aetherium's optimisations on and off (Options › Aetherium › Performance › Presets).
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of problem
+      options:
+        - Low frame rate
+        - Stutter or frame spikes
+        - Slow shader pack loading
+        - High memory or video memory use
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: Where it happens and the numbers you see (fps from F3, load time, memory).
+    validations:
+      required: true
+  - type: textarea
+    id: compare
+    attributes:
+      label: Comparison
+      description: The same scene without the pack, with the "All off" preset, or on another version. Leave empty if you have none.
+  - type: input
+    id: pack
+    attributes:
+      label: Shader pack and version
+      description: Or "none".
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings
+      description: Resolution, render distance, render scale, shadow distance, and anything else you changed.
+  - type: input
+    id: aetherium
+    attributes:
+      label: Aetherium version
+    validations:
+      required: true
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Mod loader
+      options:
+        - Fabric
+        - NeoForge
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: CPU, GPU, driver and RAM
+      description: e.g. Ryzen 7 5800X, RTX 3080 (driver 616.56), 32 GB
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux
+        - macOS
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: Sodium's version, Distant Horizons if installed, and anything else in your mods folder.
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Drag in `logs/latest.log`. It records how long the pack took to load.

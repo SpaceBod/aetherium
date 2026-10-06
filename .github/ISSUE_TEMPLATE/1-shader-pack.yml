@@ -1,0 +1,81 @@
+name: Shader pack issue
+description: A shader pack looks wrong, flickers, fails to load or is missing an effect.
+title: "[Pack] <pack name>: <short description>"
+labels: ["shader pack"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The [FAQ](https://github.com/SpaceBod/aetherium/blob/main/docs/faq.md) covers the common
+        cases (packs doing nothing, packs failing to load, packs looking wrong).
+  - type: input
+    id: pack
+    attributes:
+      label: Shader pack and version
+      description: The exact file name is best, e.g. ComplementaryUnbound_r5.9.3.zip
+    validations:
+      required: true
+  - type: input
+    id: profile
+    attributes:
+      label: Pack profile or changed options
+      description: The pack's profile (e.g. HIGH), and any options you changed. "Default" is fine.
+  - type: textarea
+    id: what
+    attributes:
+      label: What is wrong
+      description: What you see, and what it should look like instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to see it
+      description: Where and when it shows (biome, time of day, weather, holding an item, ...).
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Drag images or a short clip here. A screenshot with the pack turned off (K) for comparison helps a lot.
+  - type: input
+    id: aetherium
+    attributes:
+      label: Aetherium version
+    validations:
+      required: true
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Mod loader
+      options:
+        - Fabric
+        - NeoForge
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver version
+      description: e.g. NVIDIA RTX 3080, driver 616.56
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux
+        - macOS
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: Sodium's version, Distant Horizons if installed, and anything else in your mods folder.
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Drag in `logs/latest.log` from a session where the problem showed.

@@ -1,0 +1,16 @@
+pluginManagement {
+	// Shared Fabric/NeoForge build conventions (spacebod.base, .common, .fabric, .neoforge).
+	includeBuild('build-logic')
+	repositories {
+		maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
+		maven { name = 'NeoForged'; url = 'https://maven.neoforged.net/releases/' }
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+rootProject.name = 'aetherium'
+
+include('common')   // loader-agnostic code, compiled into both jars
+include('fabric')   // -> build/libs/aetherium-<version>+mc<series>-fabric.jar
+include('neoforge') // -> build/libs/aetherium-<version>+mc<series>-neoforge.jar

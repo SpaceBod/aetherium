@@ -1,0 +1,24 @@
+plugins {
+	id 'spacebod.neoforge'
+}
+
+neoForge {
+	runs {
+		client {
+			// Same fixed heap as fabric/build.gradle; AETHERIUM_HEAP=8G overrides it.
+			def heap = System.getenv('AETHERIUM_HEAP') ?: '16G'
+			jvmArguments.addAll("-Xms${heap}", "-Xmx${heap}")
+		}
+	}
+}
+
+// Shader-pack stack libraries (spacebod.base), jar-in-jar.
+dependencies {
+	shaderLibraries.each {
+		implementation it
+		jarJar it
+	}
+}
+
+addLodCompileOnly()
+addTerrainRendererCompileOnly()

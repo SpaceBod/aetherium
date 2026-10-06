@@ -1,0 +1,57 @@
+package dev.spacebod.aetherium.shaders.gl.uniform;
+
+import dev.spacebod.aetherium.shaders.gl.ShaderRenderSystem;
+import dev.spacebod.aetherium.shaders.gl.state.ValueUpdateNotifier;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.lwjgl.BufferUtils;
+
+import java.nio.FloatBuffer;
+import java.util.function.Supplier;
+
+public class MatrixUniform extends Uniform {
+	/** The notifier listener is registered (first update). */
+	private boolean listening;
+
+	private final FloatBuffer buffer = BufferUtils.createFloatBuffer(16);
+	private final Supplier<Matrix4fc> value;
+	private final Matrix4f cachedValue;
+
+	MatrixUniform(int location, Supplier<Matrix4fc> value) {
+		super(location);
+
+		this.cachedValue = new Matrix4f();
+		this.value = value;
+	}
+
+	MatrixUniform(int location, Supplier<Matrix4fc> value, ValueUpdateNotifier notifier) {
+		super(location, notifier);
+
+		this.cachedValue = new Matrix4f();
+		this.value = value;
+	}
+
+	@Override
+	public void update() {
+		updateValue();
+
+		if (notifier != null && !listening) {
+			// Registered once: the listener is a fixed method reference, so a bind allocates nothing.
+			listening = true;
+			notifier.setListener(this::updateValue);
+		}
+	}
+
+	public void updateValue() {
+		Matrix4fc newValue = value.get();
+
+		if (!cachedValue.equals(newValue)) {
+			cachedValue.set(newValue);
+
+			cachedValue.get(buffer);
+			buffer.rewind();
+
+			ShaderRenderSystem.uniformMatrix4fv(location, false, buffer);
+		}
+	}
+}

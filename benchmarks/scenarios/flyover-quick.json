@@ -1,0 +1,27 @@
+{
+  "id": "flyover-quick",
+  "description": "Short chunk-streaming test: the first 20 s of flyover (east at 32 blocks/s over pregenerated terrain), for one-minute checks of meshing changes.",
+  "world": "overworld-a",
+  "renderDistance": 16,
+  "simulationDistance": 8,
+  "fov": 70,
+  "timeOfDay": 6000,
+  "start": "settled",
+  "warmupSeconds": 3,
+  "pregenerate": false,
+  "path": [
+    {
+      "t": 0,
+      "dy": 60,
+      "yaw": -90,
+      "pitch": 20
+    },
+    {
+      "t": 20,
+      "dx": 640,
+      "dy": 60,
+      "yaw": -90,
+      "pitch": 20
+    }
+  ]
+}

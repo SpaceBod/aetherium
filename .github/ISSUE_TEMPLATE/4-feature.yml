@@ -1,0 +1,17 @@
+name: Feature request
+description: An idea for something Aetherium could do.
+title: "[Idea] <short description>"
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What you would like, and what it would help with.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How you manage today
+      description: Workarounds or other mods you use for it, if any.

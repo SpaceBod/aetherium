@@ -1,0 +1,96 @@
+// Applied by all three subprojects of the mod (common, fabric, neoforge).
+//
+// The jars target one Minecraft series, derived from minecraft_version (26.3, 26.3-rc-3 -> 26.3). The series drives
+// the "+mc<series>" part of the version and the minecraft dependency range written into each loader's metadata.
+plugins {
+	id 'java-library'
+}
+
+def mcSeries = (project.minecraft_version =~ /^\d+\.\d+/)[0]
+def mcNextSeries = mcSeries.tokenize('.').with { "${it[0]}.${(it[1] as int) + 1}" }
+ext.mcSeries = mcSeries
+ext.mcNextSeries = mcNextSeries
+ext.runDirName = 'run'
+
+// Every jar is named after the root project; the loader goes into the version.
+base.archivesName = rootProject.name
+
+// Directories of the shared code. The loader projects compile these sources themselves rather than
+// depending on a common jar, so each loader jar is self-contained.
+ext.commonSrc = { String sourceSet, String kind ->
+	[rootProject.file("common/src/${sourceSet}/${kind}")]
+}
+
+// Shader-pack stack (dev.spacebod.aetherium.shaders): GLSL preprocessor and AST transformer. Compiled against by
+// common/ and bundled jar-in-jar by the loader projects.
+ext.shaderLibraries = ['org.antlr:antlr4-runtime:4.13.1', 'io.github.douira:glsl-transformer:3.0.0-pre3', 'org.anarres:jcpp:1.4.14']
+
+// Level-of-detail compatibility (dev.spacebod.aetherium.shaders.compat.lod): compiled against the LOD mod's jar in
+// libs/ (built by benchmarks/tools/build-lod.sh), never bundled. The classes that touch it load only when the mod is
+// installed. Only a Fabric build of that jar exists in libs/; its API classes are the same for compiling NeoForge.
+ext.addLodCompileOnly = {
+	def lod = fileTree(dir: rootProject.file('libs'), include: 'DistantHorizons-fabric-*.jar')
+	dependencies.add('compileOnly', lod)
+	if (configurations.findByName('clientCompileOnly') != null) {
+		dependencies.add('clientCompileOnly', lod)
+	}
+}
+
+// The terrain-renderer mod's API (vertex serializers), compiled against and required at runtime by the mod metadata.
+// Its API classes are the same in every loader's jar; the Fabric one is used for compiling everywhere.
+ext.addTerrainRendererCompileOnly = {
+	def api = "maven.modrinth:sodium:${project.sodium_version}-fabric"
+	dependencies.add('compileOnly', api)
+	if (configurations.findByName('clientCompileOnly') != null) {
+		dependencies.add('clientCompileOnly', api)
+	}
+}
+
+repositories {
+	mavenCentral()
+	maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
+	exclusiveContent {
+		forRepository { maven { name = 'Modrinth'; url = 'https://api.modrinth.com/maven' } }
+		filter { includeGroup 'maven.modrinth' }
+	}
+}
+
+java {
+	withSourcesJar()
+	// A toolchain rather than source/targetCompatibility: ModDevGradle runs its own tools (asset
+	// download, the game itself) on the project toolchain, and asks for Java 21 when none is set.
+	toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 25
+	options.encoding = 'UTF-8'
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+	// Byte-identical archives for identical inputs.
+	preserveFileTimestamps = false
+	reproducibleFileOrder = true
+}
+
+tasks.withType(Jar).configureEach {
+	def projectName = rootProject.name
+	// LGPL-3.0 (LICENSE) supplements the GPL-3.0 (COPYING); both ship in every jar.
+	from(rootProject.files('LICENSE', 'COPYING')) {
+		rename { "${it}_${projectName}" }
+	}
+}
+
+// Mark every classpath and published variant with the loader it belongs to. Without this, a loader
+// project asking for project(':common') cannot tell common's variants apart from its own, and
+// dependency resolution fails. Each plugin below calls markLoader once all of its source sets exist;
+// the loader projects then ask for loaderAttribute = 'common' on their project(':common') dependency.
+def loaderAttribute = Attribute.of('dev.spacebod.loader', String)
+ext.loaderAttribute = loaderAttribute
+ext.markLoader = { String loader, List<String> extraConfigurations = [] ->
+	def names = ['apiElements', 'runtimeElements', 'sourcesElements'] + extraConfigurations
+	sourceSets.each { names += [it.compileClasspathConfigurationName, it.runtimeClasspathConfigurationName] }
+	names.each { name ->
+		configurations.named(name) { attributes { attribute(loaderAttribute, loader) } }
+	}
+}

@@ -1,0 +1,9 @@
+plugins {
+	id 'groovy-gradle-plugin'
+}
+
+dependencies {
+	// Put both loader toolchains on the convention plugins' classpath, so they can apply them by id.
+	implementation "net.fabricmc.fabric-loom:net.fabricmc.fabric-loom.gradle.plugin:${loom_version}"
+	implementation "net.neoforged.moddev:net.neoforged.moddev.gradle.plugin:${moddev_version}"
+}

@@ -1,0 +1,39 @@
+{
+	"schemaVersion": 1,
+	"id": "aetherium",
+	"version": "${version}",
+	"name": "Aetherium",
+	"description": "Shader packs on Minecraft's Vulkan renderer. Runs standard-format shader packs natively, with shader-engine and memory optimisations, a searchable pack screen, hold-to-zoom and a centred crosshair.",
+	"authors": [
+		"SpaceBod"
+	],
+	"license": "LGPL-3.0-only",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.spacebod.aetherium.fabric.client.AetheriumFabricClient"
+		]
+	},
+	"mixins": [
+		"aetherium.mixins.json",
+		{
+			"config": "aetherium.client.mixins.json",
+			"environment": "client"
+		},
+		{
+			"config": "aetherium.lod.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"fabric-api": ">=${fabric_api_min}",
+		"sodium": ">=${sodium_min}",
+		"minecraft": "${minecraft_range}",
+		"java": ">=25"
+	},
+	"breaks": {
+		"iris": "*",
+		"vitrail": "*"
+	}
+}

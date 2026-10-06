@@ -1,0 +1,11 @@
+// Shared Gradle conventions, pulled in by the root settings.gradle with includeBuild('build-logic') so the
+// Fabric and NeoForge build setup lives in one place.
+dependencyResolutionManagement {
+	repositories {
+		gradlePluginPortal()
+		maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
+		maven { name = 'NeoForged'; url = 'https://maven.neoforged.net/releases/' }
+	}
+}
+
+rootProject.name = 'build-logic'

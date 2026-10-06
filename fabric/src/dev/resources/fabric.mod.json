@@ -1,0 +1,20 @@
+{
+	"schemaVersion": 1,
+	"id": "aetherium_dev",
+	"version": "0.0.0",
+	"name": "Aetherium development tooling",
+	"description": "Benchmark driver and instrumentation for development runs. Never shipped.",
+	"license": "LGPL-3.0-only",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.spacebod.aetherium.fabric.dev.AetheriumDevFabric"
+		]
+	},
+	"mixins": [
+		"aetherium.dev.mixins.json"
+	],
+	"depends": {
+		"aetherium": "*"
+	}
+}

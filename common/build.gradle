@@ -1,0 +1,45 @@
+plugins {
+	id 'spacebod.common'
+}
+
+// Fast, game-free checks of optimisation data structures (seconds, no Minecraft launch):
+//   gradlew :common:microbench   timing of vanilla vs candidate algorithms on synthetic data
+//   gradlew :common:parity       randomized differential test of the candidates against vanilla behaviour
+sourceSets {
+	microbench {
+		java.srcDir 'src/microbench/java'
+		compileClasspath += main.output + main.compileClasspath + client.output + client.compileClasspath
+		runtimeClasspath += main.output + main.runtimeClasspath + client.output + client.runtimeClasspath
+	}
+}
+
+def microbenchTask = { String name, String mainClassName, String text ->
+	tasks.register(name, JavaExec) {
+		group = 'verification'
+		description = text
+		classpath = sourceSets.microbench.runtimeClasspath + sourceSets.microbench.output
+		mainClass = mainClassName
+		jvmArgs '-Xms2G', '-Xmx2G', '-XX:+UseG1GC', '--add-opens', 'java.base/java.util.concurrent=ALL-UNNAMED', '--add-opens', 'java.base/java.util.concurrent.locks=ALL-UNNAMED'
+		javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+		if (project.hasProperty('only')) {
+			args project.property('only')
+		}
+	}
+}
+microbenchTask('microbench', 'dev.spacebod.aetherium.microbench.Microbench', 'Times vanilla vs candidate algorithms on synthetic data')
+microbenchTask('parity', 'dev.spacebod.aetherium.microbench.Parity', 'Randomized differential tests of the candidates against vanilla behaviour')
+
+// Shader-pack stack libraries (spacebod.base), bundled into the loader jars by fabric/ and neoforge/.
+dependencies {
+	shaderLibraries.each {
+		implementation it
+		clientImplementation it
+	}
+}
+
+addLodCompileOnly()
+addTerrainRendererCompileOnly()
+// The compile harness builds the chunk mesh format, which is the terrain renderer's own format extended.
+dependencies {
+	microbenchRuntimeOnly "maven.modrinth:sodium:${project.sodium_version}-fabric"
+}

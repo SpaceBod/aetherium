@@ -1,0 +1,59 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "LGPL-3.0-only"
+
+[[mods]]
+modId = "aetherium"
+version = "${version}"
+displayName = "Aetherium"
+authors = "SpaceBod"
+# TODO: logoFile = "icon.png", displayURL and issueTrackerURL once there is a release page.
+description = '''Shader packs on Minecraft's Vulkan renderer. Runs standard-format shader packs natively, with shader-engine and memory optimisations, a searchable pack screen, hold-to-zoom and a centred crosshair.'''
+# Client-side only; servers never need it.
+displayTest = "IGNORE_ALL_VERSION"
+
+[[mixins]]
+config = "aetherium.mixins.json"
+
+[[mixins]]
+config = "aetherium.client.mixins.json"
+
+[[mixins]]
+config = "aetherium.lod.mixins.json"
+
+[[dependencies.aetherium]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neoforge_range}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.aetherium]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_range}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.aetherium]]
+modId = "sodium"
+type = "required"
+versionRange = "${sodium_range}"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.aetherium]]
+modId = "iris"
+type = "incompatible"
+reason = "Iris runs shader packs on the same render paths as Aetherium's shader engine. Use one or the other."
+versionRange = "[0,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.aetherium]]
+modId = "vitrail"
+type = "incompatible"
+reason = "Vitrail runs shader packs on the same render paths as Aetherium's shader engine. Use one or the other."
+versionRange = "[0,)"
+ordering = "NONE"
+side = "CLIENT"

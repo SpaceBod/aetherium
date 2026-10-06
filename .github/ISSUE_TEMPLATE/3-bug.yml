@@ -1,0 +1,65 @@
+name: Bug or crash
+description: Something else is broken, or the game crashes or won't start.
+title: "[Bug] <short description>"
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What went wrong, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the shader pack screen
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: crash
+    attributes:
+      label: Crash report or log
+      description: Drag in the file from `crash-reports/` if the game crashed, otherwise `logs/latest.log`.
+    validations:
+      required: true
+  - type: input
+    id: aetherium
+    attributes:
+      label: Aetherium version
+    validations:
+      required: true
+  - type: dropdown
+    id: loader
+    attributes:
+      label: Mod loader
+      options:
+        - Fabric
+        - NeoForge
+    validations:
+      required: true
+  - type: input
+    id: pack
+    attributes:
+      label: Shader pack and version
+      description: Or "none".
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver version
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux
+        - macOS
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: Sodium's version, and anything else in your mods folder.

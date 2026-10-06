@@ -1,0 +1,26 @@
+{
+  "id": "join-quick",
+  "description": "Short load test: world-join with a 15 s window, for one-minute checks of meshing changes (load.settledSeconds).",
+  "world": "overworld-a",
+  "renderDistance": 16,
+  "simulationDistance": 8,
+  "fov": 70,
+  "timeOfDay": 6000,
+  "start": "joined",
+  "warmupSeconds": 0,
+  "pregenerate": true,
+  "path": [
+    {
+      "t": 0,
+      "dy": 40,
+      "yaw": 45,
+      "pitch": 15
+    },
+    {
+      "t": 15,
+      "dy": 40,
+      "yaw": 45,
+      "pitch": 15
+    }
+  ]
+}
