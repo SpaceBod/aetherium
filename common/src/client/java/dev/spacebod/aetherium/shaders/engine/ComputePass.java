@@ -147,7 +147,7 @@ public final class ComputePass implements AutoCloseable {
 			return null;
 		}
 		try {
-			Lowered lowered = lower(name, source.getSource().get(), stage);
+			Lowered lowered = lower(source, stage);
 			if (lowered == null) {
 				return null;
 			}
@@ -253,6 +253,12 @@ public final class ComputePass implements AutoCloseable {
 
 	/** A compute program after the transform and the Vulkan lowering, with set 0 assigned (block at 0, samplers 1..n). */
 	public record Lowered(String glsl, UniformBlock.Layout layout, List<String> samplers) {
+	}
+
+	/** Lower a loaded compute program with its targets' numeric storage formats. */
+	public static @Nullable Lowered lower(ComputeSource source, TextureStage stage) {
+		return lower(source.getName(), source.getSource()
+				.map(code -> ComputeImageFormats.normalize(code, source.getParent().getPackDirectives())).orElse(null), stage);
 	}
 
 	/** Transforms and lowers one compute program (no game needed: the compile harness uses it too); null when empty. */

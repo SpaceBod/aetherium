@@ -1,5 +1,7 @@
 package dev.spacebod.aetherium.microbench;
 
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -114,4 +116,17 @@ final class SpirvInterface {
 			throw new IllegalStateException("spvc " + what + " failed: " + result);
 		}
 	}
+
+	/** Full-screen pipelines bind vertex inputs by the names in their actual buffer format. */
+	static void checkFullscreenVertexInputs(List<String> vertex) {
+		for (String input : vertex) {
+			if (input.startsWith("in ")) {
+				String name = input.split(" ")[2];
+				if (DefaultVertexFormat.POSITION_TEX.getElements().stream().noneMatch(element -> element.name().equals(name))) {
+					throw new AssertionError("vertex attribute '" + name + "' has no matching full-screen vertex buffer element");
+				}
+			}
+		}
+	}
+
 }

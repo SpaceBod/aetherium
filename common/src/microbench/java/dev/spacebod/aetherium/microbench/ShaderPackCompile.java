@@ -44,6 +44,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.util.shaderc.Shaderc;
 
 /**
@@ -119,7 +120,10 @@ final class ShaderPackCompile {
 		}
 	}
 
-	private record Program(String name, Map<String, String> sources) {
+	private record Program(String name, Map<String, String> sources, @Nullable ComputeSource compute) {
+		Program(String name, Map<String, String> sources) {
+			this(name, sources, null);
+		}
 	}
 
 	/** One lowering of one program: its stages, their SPIR-V (null = failed) and errors. */
@@ -435,7 +439,7 @@ final class ShaderPackCompile {
 
 	private static Map<PatchShaderType, String> lowerQuietly(Program program) {
 		try {
-			return lower(program.name(), program.sources());
+			return lower(program);
 		} catch (RuntimeException e) {
 			return Map.of();
 		}
@@ -531,7 +535,7 @@ final class ShaderPackCompile {
 		}
 		for (ComputeSource source : list) {
 			if (source != null && source.getSource().isPresent()) {
-				out.add(new Program(source.getName(), Map.of("csh", source.getSource().get())));
+				out.add(new Program(source.getName(), Map.of("csh", source.getSource().get()), source));
 			}
 		}
 	}
@@ -628,7 +632,7 @@ final class ShaderPackCompile {
 	private static Outcome build(Program program) {
 		Map<PatchShaderType, String> stages;
 		try {
-			stages = lower(program.name(), program.sources());
+			stages = lower(program);
 		} catch (RuntimeException e) {
 			String message = e.getMessage() == null ? e.toString() : e.getMessage();
 			Throwable cause = e.getCause();
@@ -669,9 +673,12 @@ final class ShaderPackCompile {
 	private static final Map<String, String> rawErrors = new HashMap<>();
 
 	/** The stages exactly as the engine hands them to vanilla's compiler, for the current lowering mode. */
-	private static Map<PatchShaderType, String> lower(String name, Map<String, String> src) {
+	private static Map<PatchShaderType, String> lower(Program program) {
+		String name = program.name();
+		Map<String, String> src = program.sources();
 		if (src.containsKey("csh")) {
-			ComputePass.Lowered compute = ComputePass.lower(name, src.get("csh"), stageOf(name));
+			ComputePass.Lowered compute = program.compute() == null ? ComputePass.lower(name, src.get("csh"), stageOf(name))
+					: ComputePass.lower(program.compute(), stageOf(name));
 			return compute == null ? null : Map.of(PatchShaderType.COMPUTE, compute.glsl());
 		}
 		if (!src.containsKey("vsh") || !src.containsKey("fsh")) {

@@ -26,6 +26,7 @@ def microbenchTask = { String name, String mainClassName, String text ->
 		}
 	}
 }
+microbenchTask('computeImageFormatChecks', 'dev.spacebod.aetherium.shaders.engine.ComputeImageFormatFixtures', 'Checks numeric compute image stores on floating-point targets')
 microbenchTask('microbench', 'dev.spacebod.aetherium.microbench.Microbench', 'Times vanilla vs candidate algorithms on synthetic data')
 microbenchTask('parity', 'dev.spacebod.aetherium.microbench.Parity', 'Randomized differential tests of the candidates against vanilla behaviour')
 

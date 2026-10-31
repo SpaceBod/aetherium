@@ -203,6 +203,9 @@ final class LoweringFixtures {
 			words.put(e.getKey(), w);
 			lines.put(e.getKey(), SpirvInterface.reflect(spirv, e.getKey() == PatchShaderType.COMPUTE));
 		}
+		if (f.kind() == Kind.FULLSCREEN || f.kind() == Kind.FULLSCREEN_METAL) {
+			SpirvInterface.checkFullscreenVertexInputs(lines.getOrDefault(V, List.of()));
+		}
 		Reflected r = new Reflected(lines, stages, layout, resources, words);
 		for (Check c : f.checks()) {
 			boolean ok;
@@ -394,6 +397,20 @@ final class LoweringFixtures {
 				glsl("#version 150 compatibility", "out vec2 uv;", "void main() { uv = gl_MultiTexCoord0.st; gl_Position = ftransform(); }"),
 				glsl("#version 150 compatibility", "uniform sampler2D colortex0;", "in vec2 uv;", "void main() { gl_FragData[0] = texture(colortex0, uv); }"),
 				check("uv matched", r -> r.location(V, "out", "uv") == r.location(F, "in", "uv"))));
+		out.add(fullscreen("compatibility profile with explicit position input",
+				glsl("#version 430 compatibility", "in vec3 vaPosition;",
+						"void main() { gl_Position = vec4(vaPosition.xy * 8.0 - vec2(6.5, 1.5), 0.0, 1.0); }"),
+				glsl("#version 430 compatibility", "uniform sampler2D colortex1;",
+						"void main() { gl_FragData[0] = texelFetch(colortex1, ivec2(gl_FragCoord.xy), 0); }"),
+				check("position bound to the full-screen buffer", r -> r.location(V, "in", "Position") >= 0)));
+		out.add(fullscreen("compatibility profile mixing explicit inputs and legacy built-ins",
+				glsl("#version 430 compatibility", "in vec3 vaPosition;", "in vec2 vaUV0;", "out vec2 uv;",
+						"void main() { uv = vaUV0 + gl_MultiTexCoord0.xy;",
+						"gl_Position = ftransform() + vec4(vaPosition - gl_Vertex.xyz, 0.0); }"),
+				glsl("#version 430 compatibility", "uniform sampler2D colortex0;", "in vec2 uv;",
+						"void main() { gl_FragData[0] = texture(colortex0, uv); }"),
+				check("explicit and legacy inputs share buffer elements", r -> r.location(V, "in", "Position") >= 0
+						&& r.location(V, "in", "UV0") >= 0 && r.location(V, "out", "uv") == r.location(F, "in", "uv"))));
 		out.add(fullscreen("version 450 with explicit bindings",
 				glsl("#version 450 core", "layout(location = 0) in vec3 vaPosition;", "layout(location = 0) out vec2 uv;",
 						"void main() { uv = vaPosition.xy; gl_Position = vec4(vaPosition, 1.0); }"),

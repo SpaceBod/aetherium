@@ -4,13 +4,17 @@ import io.github.douira.glsl_transformer.ast.node.TranslationUnit;
 import io.github.douira.glsl_transformer.ast.node.expression.Expression;
 import io.github.douira.glsl_transformer.ast.node.expression.LiteralExpression;
 import io.github.douira.glsl_transformer.ast.node.expression.ReferenceExpression;
+import io.github.douira.glsl_transformer.ast.node.type.qualifier.StorageQualifier.StorageType;
 import io.github.douira.glsl_transformer.ast.query.Root;
 import io.github.douira.glsl_transformer.ast.query.match.AutoHintedMatcher;
 import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import io.github.douira.glsl_transformer.parser.ParseShape;
+import io.github.douira.glsl_transformer.util.Type;
 import dev.spacebod.aetherium.shaders.gl.shader.ShaderType;
 import dev.spacebod.aetherium.shaders.pipeline.transform.parameter.Parameters;
+
+import static dev.spacebod.aetherium.shaders.pipeline.transform.transformer.CommonTransformer.addIfNotExists;
 
 public class CompositeTransformer {
 	private static final AutoHintedMatcher<Expression> glTextureMatrix0To7 = new AutoHintedMatcher<>(
@@ -41,9 +45,12 @@ public class CompositeTransformer {
 		root.replaceExpressionMatches(t, glTextureMatrix0To7, "mat4(1.0)");
 
 		if (parameters.type.glShaderType == ShaderType.VERTEX) {
+			// Explicit attributes can appear alongside compatibility-profile built-ins.
+			root.rename("vaPosition", "Position");
+			root.rename("vaUV0", "UV0");
 			root.replaceReferenceExpressions(t, "gl_MultiTexCoord0",
 				"vec4(UV0, 0.0, 1.0)");
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS, "in vec2 UV0;");
+			addIfNotExists(root, t, tree, "UV0", Type.F32VEC2, StorageType.IN);
 			CommonTransformer.replaceGlMultiTexCoordBounded(t, root, 1, 7);
 		}
 
@@ -58,7 +65,7 @@ public class CompositeTransformer {
 		root.replaceReferenceExpressions(t, "gl_NormalMatrix", "mat3(1.0)");
 
 		if (parameters.type.glShaderType == ShaderType.VERTEX) {
-			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS, "in vec3 Position;");
+			addIfNotExists(root, t, tree, "Position", Type.F32VEC3, StorageType.IN);
 			if (root.identifierIndex.has("ftransform")) {
 				tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_FUNCTIONS,
 					"vec4 ftransform() { return gl_ModelViewProjectionMatrix * gl_Vertex; }");
