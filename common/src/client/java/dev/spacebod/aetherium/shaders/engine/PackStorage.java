@@ -387,7 +387,8 @@ public final class PackStorage implements AutoCloseable {
 				bufferSizes[i] = size;
 				boolean upload = info.content() != null;
 				VkBufferCreateInfo create = VkBufferCreateInfo.calloc(stack).sType$Default().size(size)
-						.usage(VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+						.usage(VK10.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK10.VK_BUFFER_USAGE_TRANSFER_DST_BIT
+								| VK10.VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)
 						.sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE);
 				VmaAllocationCreateInfo alloc = VmaAllocationCreateInfo.calloc(stack).usage(Vma.VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
 				if (upload) {

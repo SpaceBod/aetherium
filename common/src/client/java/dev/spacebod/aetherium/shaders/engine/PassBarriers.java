@@ -50,24 +50,17 @@ public final class PassBarriers {
 		return name != null && name.startsWith(LABEL_PREFIX);
 	}
 
-	private static final long PASS_SOURCE_STAGES = KHRSynchronization2.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT_KHR;
+	// Access scopes include only explicitly named stages. A later graphics stage orders geometry/tessellation
+	// execution, but does not make their storage writes available. Depth writes can also happen in early tests.
+	private static final long PASS_SOURCE_STAGES = KHRSynchronization2.VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT_KHR;
 	private static final long PASS_SOURCE_ACCESS = KHRSynchronization2.VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT_KHR
 			| KHRSynchronization2.VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT_KHR
 			| KHRSynchronization2.VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT_KHR;
 	/**
-	 * Everything a later command may do with what a pass or a mip chain left behind (a destination stage covers the
-	 * stages logically after it: the geometry and tessellation stages follow the vertex shader).
+	 * Everything a later command may do with what a pass or a mip chain left behind. ALL_GRAPHICS includes geometry
+	 * and tessellation accesses as well as vertex/fragment accesses, without naming optional stages individually.
 	 */
-	private static final long NEXT_STAGES = KHRSynchronization2.VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT_KHR
-			| KHRSynchronization2.VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR
+	private static final long NEXT_STAGES = KHRSynchronization2.VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT_KHR
 			| KHRSynchronization2.VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR
 			| KHRSynchronization2.VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT_KHR;
 	private static final long NEXT_ACCESS = KHRSynchronization2.VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT_KHR

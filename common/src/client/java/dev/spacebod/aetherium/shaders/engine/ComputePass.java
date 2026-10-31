@@ -74,6 +74,7 @@ public final class ComputePass implements AutoCloseable {
 	private final long pool;
 	private final long[] sets = new long[SLOTS];
 	private final int blockSize;
+	private final int uniformStride;
 	private final long uniformBuffer;
 	private final long uniformAllocation;
 	private final ByteBuffer uniformMemory;
@@ -97,6 +98,8 @@ public final class ComputePass implements AutoCloseable {
 		this.layout = layout;
 		this.pipeline = pipeline;
 		this.blockSize = blockSize;
+		int alignment = Math.max(16, vulkan.getDeviceInfo().limits().minUniformOffsetAlignment());
+		this.uniformStride = (Math.max(16, blockSize) + alignment - 1) / alignment * alignment;
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			long images = samplers.stream().filter(s -> targetImage(s) != null).count();
 			int samplerCount = (int) Math.max(1, (samplers.size() - images) * SLOTS);
@@ -111,7 +114,7 @@ public final class ComputePass implements AutoCloseable {
 			for (int i = 0; i < SLOTS; i++) {
 				sets[i] = VulkanCompute.allocate(device, pool, setLayout);
 			}
-			long bufferSize = (long) Math.max(16, blockSize) * SLOTS;
+			long bufferSize = (long) uniformStride * SLOTS;
 			VmaAllocationCreateInfo alloc = VmaAllocationCreateInfo.calloc(stack).usage(Vma.VMA_MEMORY_USAGE_AUTO)
 					.flags(Vma.VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | Vma.VMA_ALLOCATION_CREATE_MAPPED_BIT);
 			VmaAllocationInfo info = VmaAllocationInfo.calloc(stack);
@@ -289,7 +292,7 @@ public final class ComputePass implements AutoCloseable {
 		}
 		slot = (slot + 1) % SLOTS;
 		long set = sets[slot];
-		int offset = Math.max(16, blockSize) * slot;
+		int offset = uniformStride * slot;
 		if (blockSize > 0) {
 			ByteBuffer bytes = uniforms.buffer().duplicate().clear();
 			bytes.limit(Math.min(bytes.capacity(), blockSize));
