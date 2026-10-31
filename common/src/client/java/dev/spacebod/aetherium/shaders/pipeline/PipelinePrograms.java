@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.jspecify.annotations.Nullable;
 
@@ -38,6 +39,12 @@ public final class PipelinePrograms {
 
 	private static final Map<RenderPipeline, Choice> MAIN = new IdentityHashMap<>();
 	private static final Map<RenderPipeline, ShaderKey> SHADOW = new IdentityHashMap<>();
+	/** Explicit registrations, separate from compatible copies cached in the lookup maps. */
+	private static final Set<RenderPipeline> MAIN_REGISTERED = Collections.newSetFromMap(new IdentityHashMap<>());
+	private static final Set<RenderPipeline> SHADOW_REGISTERED = Collections.newSetFromMap(new IdentityHashMap<>());
+	/** Pipelines already checked for compatible copies, without a match. */
+	private static final Set<RenderPipeline> MAIN_MISSES = Collections.newSetFromMap(new IdentityHashMap<>());
+	private static final Set<RenderPipeline> SHADOW_MISSES = Collections.newSetFromMap(new IdentityHashMap<>());
 	/** Registration order (terrain first): the order programs are prebuilt in. */
 	private static final List<RenderPipeline> MAIN_ORDER = new ArrayList<>();
 	private static final List<RenderPipeline> SHADOW_ORDER = new ArrayList<>();
@@ -166,23 +173,27 @@ public final class PipelinePrograms {
 	}
 
 	private static void mainChoice(RenderPipeline pipeline, Choice choice) {
-		if (MAIN.put(pipeline, choice) == null) {
+		MAIN.put(pipeline, choice);
+		if (MAIN_REGISTERED.add(pipeline)) {
 			MAIN_ORDER.add(pipeline);
+			MAIN_MISSES.clear();
 		}
 	}
 
 	private static void shadow(RenderPipeline pipeline, ShaderKey key) {
-		if (SHADOW.put(pipeline, key) == null) {
+		SHADOW.put(pipeline, key);
+		if (SHADOW_REGISTERED.add(pipeline)) {
 			SHADOW_ORDER.add(pipeline);
+			SHADOW_MISSES.clear();
 		}
 	}
 
 	/**
 	 * A terrain pipeline created after start-up (the chunk renderer's, one per terrain pass): drawn with {@code main} in
-	 * the main pass and {@code shadow} in the shadow pass. False when it was already known.
+	 * the main pass and {@code shadow} in the shadow pass. False when it was already explicitly registered.
 	 */
 	public static boolean addTerrain(RenderPipeline pipeline, ShaderKey main, ShaderKey shadow) {
-		if (MAIN.containsKey(pipeline)) {
+		if (MAIN_REGISTERED.contains(pipeline)) {
 			return false;
 		}
 		main(pipeline, main);
@@ -208,6 +219,15 @@ public final class PipelinePrograms {
 	/** The pack program for a vanilla pipeline in the main (gbuffers) pass, or null (draw it with its vanilla shader). */
 	public static @Nullable ShaderKey main(RenderPipeline pipeline, Context context) {
 		Choice choice = MAIN.get(pipeline);
+		if (choice == null && !MAIN_MISSES.contains(pipeline)) {
+			RenderPipeline original = originalCopy(pipeline, MAIN_ORDER);
+			if (original != null) {
+				choice = MAIN.get(original);
+				MAIN.put(pipeline, choice);
+			} else {
+				MAIN_MISSES.add(pipeline);
+			}
+		}
 		return choice == null ? LodCompat.key(pipeline, false) : choice.choose(context);
 	}
 
@@ -217,7 +237,36 @@ public final class PipelinePrograms {
 	 */
 	public static @Nullable ShaderKey shadow(RenderPipeline pipeline, Context context) {
 		ShaderKey key = SHADOW.get(pipeline);
+		if (key == null && !SHADOW_MISSES.contains(pipeline)) {
+			RenderPipeline original = originalCopy(pipeline, SHADOW_ORDER);
+			if (original != null) {
+				key = SHADOW.get(original);
+				SHADOW.put(pipeline, key);
+			} else {
+				SHADOW_MISSES.add(pipeline);
+			}
+		}
 		return key != null ? key : LodCompat.key(pipeline, true);
+	}
+
+	/**
+	 * Cosmetic mods copy vanilla pipelines to change culling, blending or depth state. Keep their shader choice when
+	 * the location and complete shader interface still match; WorldProgram builds with the copy's own render state.
+	 */
+	private static @Nullable RenderPipeline originalCopy(RenderPipeline pipeline, List<RenderPipeline> originals) {
+		for (RenderPipeline original : originals) {
+			if (pipeline.getLocation().equals(original.getLocation())
+					&& pipeline.getShaders().equals(original.getShaders())
+					&& pipeline.getShaderDefines().equals(original.getShaderDefines())
+					&& pipeline.getVertexFormatBindings().equals(original.getVertexFormatBindings())
+					&& pipeline.getPrimitiveTopology() == original.getPrimitiveTopology()
+					&& pipeline.pushConstantSize() == original.pushConstantSize()
+					&& pipeline.getBindGroupLayouts().size() == original.getBindGroupLayouts().size()
+					&& pipeline.getBindGroupLayouts().containsAll(original.getBindGroupLayouts())) {
+				return original;
+			}
+		}
+		return null;
 	}
 
 	private static ShaderKey cutout(Context c) {

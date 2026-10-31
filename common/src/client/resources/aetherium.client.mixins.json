@@ -16,6 +16,7 @@
 		"access.BlockEntityRenderStateAccessor",
 		"access.RenderTypeAccessor",
 		"access.RenderTargetAccessor",
+		"compat.PolytoneLeashMixin",
 		"chunks.BlockRendererMixin",
 		"chunks.ChunkRendererAccessor",
 		"chunks.ChunkMeshFormatsMixin",
