@@ -19,7 +19,7 @@ import java.util.function.IntFunction;
  * for world programs and none for full-screen passes), replaced per colour target by {@code blend.<program>.<buffer>}
  * (the buffer names the target, not the draw-buffer position). Integer formats never blend.
  */
-final class PipelineState {
+public final class PipelineState {
 	private PipelineState() {
 	}
 
@@ -28,7 +28,7 @@ final class PipelineState {
 	 * {@code written}: the targets the program writes (others are masked off); {@code fallbackBlend}: blending when the
 	 * pack sets none for the program.
 	 */
-	static ColorTargetState[] colorTargets(int[] attachments, IntFunction<GpuFormat> format, int[] written, ProgramDirectives directives,
+	public static ColorTargetState[] colorTargets(int[] attachments, IntFunction<GpuFormat> format, int[] written, ProgramDirectives directives,
 			Optional<BlendFunction> fallbackBlend, int writeMask) {
 		Optional<BlendFunction> blend = programBlend(directives, fallbackBlend);
 		Map<Integer, Optional<BlendFunction>> perBuffer = bufferBlends(directives);

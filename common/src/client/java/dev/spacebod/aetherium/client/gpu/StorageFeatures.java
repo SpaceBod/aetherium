@@ -32,6 +32,8 @@ public final class StorageFeatures {
 	public static final FeatureSet READ_WITHOUT_FORMAT = vk10("shaderStorageImageReadWithoutFormat");
 	/** Per-attachment blend and write masks, which vanilla already sets for multi-target pipelines. */
 	public static final FeatureSet INDEPENDENT_BLEND = vk10("independentBlend");
+	public static final FeatureSet SUBGROUP_PARTITIONED = new FeatureSet("Aetherium subgroup partitions",
+			Set.of("VK_NV_shader_subgroup_partitioned"), Set.of());
 	/** 16 and 8 bit arithmetic, storage buffer access in those types, and subgroup operations over them. */
 	public static final List<FeatureSet> NARROW = List.of(
 			feature(VulkanFeatureSets.VK12_FEATURES_STRUCT, "shaderFloat16"),
@@ -47,7 +49,7 @@ public final class StorageFeatures {
 
 	static {
 		List<FeatureSet> all = new java.util.ArrayList<>(List.of(VERTEX_STORES, FRAGMENT_STORES, EXTENDED_FORMATS, WRITE_WITHOUT_FORMAT,
-				READ_WITHOUT_FORMAT, INDEPENDENT_BLEND));
+				READ_WITHOUT_FORMAT, INDEPENDENT_BLEND, SUBGROUP_PARTITIONED));
 		all.addAll(NARROW);
 		ALL = List.copyOf(all);
 	}

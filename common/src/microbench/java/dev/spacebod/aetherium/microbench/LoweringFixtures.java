@@ -2,26 +2,38 @@ package dev.spacebod.aetherium.microbench;
 
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.pipeline.BlendFactor;
+import com.mojang.renderpearl.api.pipeline.BlendFunction;
+import com.mojang.renderpearl.api.pipeline.ColorTargetState;
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
+import dev.spacebod.aetherium.client.gpu.PackRenderPipeline;
+import dev.spacebod.aetherium.client.gpu.ShaderCompiler;
 import dev.spacebod.aetherium.shaders.engine.CompositePass;
 import dev.spacebod.aetherium.shaders.engine.ComputePass;
 import dev.spacebod.aetherium.shaders.engine.ShadowSampling;
 import dev.spacebod.aetherium.shaders.engine.StorageBindings;
 import dev.spacebod.aetherium.shaders.engine.UniformBlock;
+import dev.spacebod.aetherium.shaders.engine.UniformProviderFixtures;
 import dev.spacebod.aetherium.shaders.engine.WorldInterface;
 import dev.spacebod.aetherium.shaders.gl.blending.AlphaTests;
 import dev.spacebod.aetherium.shaders.pipeline.transform.PatchShaderType;
+import dev.spacebod.aetherium.shaders.pipeline.transform.lowering.ShadowFunctionFixtures;
 import dev.spacebod.aetherium.shaders.pipeline.transform.transformer.VanillaInterface;
 import dev.spacebod.aetherium.shaders.shaderpack.texture.TextureStage;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.util.shaderc.Shaderc;
 
 /**
@@ -78,6 +90,7 @@ final class LoweringFixtures {
 	private static final String NL = "\n";
 
 	static void run() {
+		ShadowFunctionFixtures.run();
 		ShadowSampling.filterAllForCompileCheck();
 		// Storage writes allowed in every stage (the device features a pack's programs need).
 		dev.spacebod.aetherium.client.gpu.StorageFeatures.assumeForCompileCheck();
@@ -109,7 +122,87 @@ final class LoweringFixtures {
 		StorageBindings.reset();
 		System.out.printf(Locale.ROOT, "%nlowering fixtures: %d passed, %d failed%n", passed, failed);
 		directiveScans();
+		pipelineStates();
+		UniformProviderFixtures.run();
+		compositeConstantShapes();
 		AlbedoSamplerFixtures.run();
+		if (failed != 0) {
+			throw new AssertionError(failed + " lowering fixture(s) failed");
+		}
+	}
+
+
+
+
+
+
+
+
+
+
+
+	private static void compositeConstantShapes() {
+		int[] valid = {
+				0x07230203, 0x00010500, 0, 64, 0,
+				(3 << 16) | 22, 1, 32,
+				(4 << 16) | 23, 2, 1, 3,
+				(4 << 16) | 43, 1, 3, 0,
+				(6 << 16) | 44, 2, 4, 3, 3, 3
+		};
+		if (!ShaderCompiler.validCompositeConstants(spirv(valid))) {
+			throw new AssertionError("a three-component vector constant was rejected");
+		}
+		int[] extraComponent = Arrays.copyOf(valid, valid.length + 1);
+		extraComponent[16] = (7 << 16) | 44;
+		extraComponent[extraComponent.length - 1] = 3;
+		if (ShaderCompiler.validCompositeConstants(spirv(extraComponent))) {
+			throw new AssertionError("a three-component vector with four constituents was accepted");
+		}
+		if (ShaderCompiler.validCompositeConstants(spirv(Arrays.copyOf(valid, valid.length - 1)))) {
+			throw new AssertionError("a truncated composite constant was accepted");
+		}
+		System.out.println("composite constants: valid vector shape retained; extra constituents and truncation rejected");
+	}
+
+
+
+
+
+
+
+	/** A multi-target program can use distinct blend functions for normal and colour outputs. */
+	private static void pipelineStates() {
+		Identifier id = Identifier.fromNamespaceAndPath("aetherium_shaders", "fixture/independent_blending");
+		BlendFunction alpha = new BlendFunction(BlendFactor.SRC_ALPHA, BlendFactor.ONE_MINUS_SRC_ALPHA, BlendFactor.ZERO, BlendFactor.ONE);
+		BlendFunction water = new BlendFunction(BlendFactor.ONE, BlendFactor.ZERO, BlendFactor.ONE_MINUS_DST_ALPHA, BlendFactor.ONE);
+		ColorTargetState[] targets = {
+				new ColorTargetState(Optional.empty(), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL),
+				new ColorTargetState(Optional.of(water), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL),
+				new ColorTargetState(Optional.of(alpha), GpuFormat.RGBA16_FLOAT, ColorTargetState.WRITE_ALL)
+		};
+		RenderPipeline pipeline = PackRenderPipeline.build(RenderPipeline.builder().withLocation(id).withVertexShader(id).withFragmentShader(id)
+				.withPrimitiveTopology(PrimitiveTopology.TRIANGLES).withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+				.withCull(false).withPushConstantSize(16), targets);
+		if (!pipeline.getColorTargetStates().equals(Arrays.asList(targets)) || !pipeline.getLocation().equals(id)
+				|| pipeline.isCull() || pipeline.pushConstantSize() != 16 || pipeline.getVertexFormatBinding(0) != DefaultVertexFormat.POSITION_TEX) {
+			throw new AssertionError("independent blending changed attachment or pipeline state");
+		}
+		targets[1] = null;
+		if (pipeline.getColorTargetStates().get(1) == null) {
+			throw new AssertionError("pipeline retained the caller's mutable attachment array");
+		}
+		boolean rejected = false;
+		try {
+			PackRenderPipeline.build(RenderPipeline.builder().withLocation(id).withVertexShader(id)
+					.withPrimitiveTopology(PrimitiveTopology.TRIANGLES), new ColorTargetState[]{
+							pipeline.getColorTargetStates().get(1), pipeline.getColorTargetStates().get(2)});
+		} catch (IllegalStateException e) {
+			rejected = e.getMessage().equals("Missing fragment shader");
+		}
+		if (!rejected) {
+			throw new AssertionError("independent blending bypassed unrelated pipeline validation");
+		}
+		System.out.println("pipeline states: independent blend functions preserved; targets copied; shader validation kept");
 	}
 
 	/** The text scans that stay text (they run before parsing): uniform declarations and comment directives. */
@@ -204,6 +297,10 @@ final class LoweringFixtures {
 			lines.put(e.getKey(), SpirvInterface.reflect(spirv, e.getKey() == PatchShaderType.COMPUTE));
 		}
 		Reflected r = new Reflected(lines, stages, layout, resources, words);
+		String mismatch = SpirvInterface.interpolationMismatch(lines);
+				if (mismatch != null) {
+					return new Result(false, mismatch, stages);
+				}
 		for (Check c : f.checks()) {
 			boolean ok;
 			try {
@@ -257,6 +354,17 @@ final class LoweringFixtures {
 
 	private static List<Fixture> fixtures() {
 		List<Fixture> out = new ArrayList<>();
+		out.add(geometryLocations());
+		out.add(fullscreen("matrix transpose in a global const initializer",
+				vertex("out vec2 uv;", "uv = vec2(0);"),
+				glsl("#version 330 core", "const mat3 basis = mat3(1);", "const mat3 rotated = transpose(basis);",
+						"out vec4 color;", "void main() { color = vec4(rotated[0], 1); }"),
+				check("matrix expression accepted after const lowering", r -> !r.sources().get(F).contains("const mat3 rotated"))));
+		out.add(fullscreen("integer varying: fragment flat qualifier also set on vertex output",
+				vertex("out uint material;", "material = 9u;"),
+				glsl("#version 330 core", "flat in uint material;", "out vec4 color;", "void main() { color = vec4(float(material)); }"),
+				check("flat interpolation recorded in both modules", r -> r.stage(V).stream().anyMatch(l -> l.startsWith("out ") && l.contains(" material ") && l.endsWith(" flat"))
+						&& r.stage(F).stream().anyMatch(l -> l.startsWith("in ") && l.contains(" material ") && l.endsWith(" flat")))));
 		out.add(fullscreen("multi-declarator varyings",
 				vertex("flat out vec3 a, b, c;" + NL + "out vec2 uv, lm[2], st;", "a = vec3(1); b = a; c = b; uv = vec2(0); lm[0] = uv; lm[1] = uv; st = uv;"),
 				glsl("#version 330 core", "flat in vec3 a, b, c;", "in vec2 uv, lm[2], st;", "layout(location = 0) out vec4 color;",
@@ -282,7 +390,25 @@ final class LoweringFixtures {
 				vertex("out VertexData { vec2 uv; flat int id; vec4 tint[2]; } v;", "v.uv = vec2(0); v.id = 1; v.tint[0] = vec4(1); v.tint[1] = vec4(0);"),
 				glsl("#version 330 core", "in VertexData { vec2 uv; flat int id; vec4 tint[2]; } v;", "layout(location = 0) out vec4 color;",
 						"void main() { color = v.tint[1] + vec4(v.uv, float(v.id), 0); }"),
-				check("block compiled with a location", r -> r.has(V, "out location=0 v") || r.has(V, "out location=0 VertexData"))));
+				check("members matched without struct interfaces", r -> r.location(V, "out", "aeth_io_vertex_VertexData_uv") >= 0
+						&& r.location(V, "out", "aeth_io_vertex_VertexData_tint") == r.location(F, "in", "aeth_io_vertex_VertexData_tint")
+						&& r.lines().values().stream().flatMap(List::stream)
+								.noneMatch(l -> (l.startsWith("in ") || l.startsWith("out ")) && l.contains(" t15x")))));
+		out.add(fullscreen("unnamed interface block with explicit member locations",
+				vertex("out DATA { layout(location = 3) flat vec2 offset; layout(location = 5) flat vec3 sun; };",
+						"offset = vec2(0.5); sun = vec3(1);"),
+				glsl("#version 440 core", "in DATA { layout(location = 3) flat vec2 offset; layout(location = 5) flat vec3 sun; };",
+						"layout(location = 0) out vec4 color;", "void main() { color = vec4(sun * offset.x, 1); }"),
+				check("explicit member locations and flat interpolation kept", r -> r.location(V, "out", "aeth_io_vertex_DATA_offset") == 3
+						&& r.location(F, "in", "aeth_io_vertex_DATA_sun") == 5
+						&& r.sources().get(F).contains("flat in vec3 aeth_io_vertex_DATA_sun"))));
+		out.add(fullscreen("interface block instance names differ between stages",
+				vertex("out DATA { vec2 uv; flat int id; } data_out;", "data_out.uv = vec2(0.5); data_out.id = 1;"),
+				glsl("#version 330 core", "in DATA { vec2 uv; flat int id; };", "layout(location = 0) out vec4 color;",
+						"float localValue(float uv) { return uv; }", "void main() { color = vec4(uv, localValue(float(id)), 1); }"),
+				check("named outputs match unnamed inputs; local shadows kept", r -> r.location(V, "out", "aeth_io_vertex_DATA_uv") >= 0
+						&& r.location(V, "out", "aeth_io_vertex_DATA_uv") == r.location(F, "in", "aeth_io_vertex_DATA_uv")
+						&& r.sources().get(F).contains("return uv;"))));
 		out.add(fullscreen("fragment input with no vertex output",
 				vertex("out vec2 uv;", "uv = vec2(0);"),
 				glsl("#version 330 core", "in vec2 uv;", "flat in int neverWritten;", "noperspective in vec3 alsoMissing;", "layout(location = 0) out vec4 color;",
@@ -340,6 +466,73 @@ final class LoweringFixtures {
 					return z.variables() == 2 && z.undefs() == 0 && !SpirvInterface.reflect(spirv(z.words()), false).isEmpty();
 				}),
 				check("a stage that writes before reading is unchanged", r -> !dev.spacebod.aetherium.client.gpu.LocalZeroes.apply(r.words().get(V)).changed())));
+		out.add(new Fixture("compute: comparison helper without overload keeps its name", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x=1) in;", "uniform sampler2DShadow shadowtex0;",
+						"layout(rgba16f) uniform image2D colorimg;",
+						"float compareOnly(sampler2DShadow s, vec3 p) { return textureLod(s, p, 0.0); }",
+						"void main() { imageStore(colorimg, ivec2(0), vec4(compareOnly(shadowtex0, vec3(0.5)))); }"),
+				null, null, List.of(check("non-colliding declaration and calls retain their names", r ->
+						!r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_")
+						&& r.sources().get(PatchShaderType.COMPUTE).contains("compareOnly(")))));
+		out.add(new Fixture("compute: comparison helper accepts grouped sampler argument", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x=1) in;", "uniform sampler2DShadow shadowtex0;",
+						"layout(rgba16f) uniform image2D colorimg;",
+						"float compareOnly(sampler2DShadow s, vec3 p) { return textureLod(s, p, 0.0); }",
+						"void main() { imageStore(colorimg, ivec2(0), vec4(compareOnly((shadowtex0), vec3(0.5)))); }"),
+				null, null, List.of(check("grouped argument does not leave a renamed declaration behind", r ->
+						!r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_")))));
+		out.add(new Fixture("compute: different coordinate types do not collide", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x=1) in;", "uniform sampler2DShadow shadowtex0;", "uniform sampler2D depthtex0;",
+						"layout(rgba16f) uniform image2D colorimg;",
+						"float fetchDepth(sampler2DShadow s, vec3 p) { return textureLod(s, p, 0.0); }",
+						"float fetchDepth(sampler2D s, vec2 p) { return textureLod(s, p, 0.0).r; }",
+						"void main() { imageStore(colorimg, ivec2(0), vec4(fetchDepth(shadowtex0, vec3(0.5)), fetchDepth(depthtex0, vec2(0.5)), 0, 1)); }"),
+				null, null, List.of(check("other parameter types keep lowered overload signatures distinct", r ->
+						!r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_")))));
+		out.add(new Fixture("compute: prototype and definition are one comparison overload", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x=1) in;", "uniform sampler2DShadow shadowtex0;",
+						"layout(rgba16f) uniform image2D colorimg;", "float compareOnly(sampler2DShadow source, vec3 position);",
+						"float compareOnly(sampler2DShadow s, vec3 p) { return textureLod(s, p, 0.0); }",
+						"void main() { imageStore(colorimg, ivec2(0), vec4(compareOnly(shadowtex0, vec3(0.5)))); }"),
+				null, null, List.of(check("parameter names do not create an artificial overload collision", r ->
+						!r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_")))));
+		out.add(new Fixture("compute: different parameter array lengths do not collide", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x=1) in;", "uniform sampler2DShadow shadowtex0;", "uniform sampler2D depthtex0;",
+						"layout(rgba16f) uniform image2D colorimg;",
+						"float fetchDepth(sampler2DShadow s, vec3 p[1]) { return textureLod(s, p[0], 0.0); }",
+						"float fetchDepth(sampler2D s, vec3 p[2]) { return textureLod(s, p[1].xy, 0.0).r; }",
+						"void main() { vec3 a[1]=vec3[1](vec3(0.5)); vec3 b[2]=vec3[2](vec3(0.5),vec3(0.25));",
+						"imageStore(colorimg, ivec2(0), vec4(fetchDepth(shadowtex0,a),fetchDepth(depthtex0,b),0,1)); }"),
+				null, null, List.of(check("array dimensions remain part of the overload signature", r ->
+						!r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_")))));
+		out.add(new Fixture("compute: sampler erasure preserves numeric overload selection", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x=1) in;", "uniform sampler2DShadow shadowtex0;", "uniform sampler2D depthtex0;",
+						"layout(rgba16f) uniform image2D colorimg;",
+						"float pickDepth(sampler2DShadow s,float weight) { return textureLod(s,vec3(0.5),0.0)*weight; }",
+						"float pickDepth(sampler2D s,int offset) { return textureLod(s,vec2(0.5),0.0).r+float(offset); }",
+						"void main() { imageStore(colorimg,ivec2(0),vec4(pickDepth((shadowtex0),1),pickDepth(depthtex0,1),0,1)); }"),
+				null, null, List.of(check("integer-to-float conversion cannot select the ordinary depth overload after erasure", r ->
+						r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_pickDepth_0")))));
+		out.add(new Fixture("compute: numeric overloads with the same sampler kind keep names", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x=1) in;", "uniform sampler2DShadow shadowtex0;",
+						"layout(rgba16f) uniform image2D colorimg;",
+						"float pickDepth(sampler2DShadow s,float weight) { return textureLod(s,vec3(0.5),0.0)*weight; }",
+						"float pickDepth(sampler2DShadow s,int offset) { return textureLod(s,vec3(0.5),0.0)+float(offset); }",
+						"void main() { imageStore(colorimg,ivec2(0),vec4(pickDepth(shadowtex0,1),pickDepth(shadowtex0,0.5),0,1)); }"),
+				null, null, List.of(check("unchanged numeric overload resolution does not trigger a rename", r ->
+						!r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_")))));
+		out.add(new Fixture("compute: comparison and depth sampler overloads stay distinct", Kind.COMPUTE,
+				glsl("#version 430 core", "layout(local_size_x = 1) in;", "uniform sampler2DShadow shadowtex0;", "uniform sampler2D depthtex0;",
+						"layout(rgba16f) uniform image2D colorimg;",
+						"float sampleDepth(sampler2DShadow s, vec3 p) { return textureLod(s, p, 0.0); }",
+						"float sampleDepth(sampler2D s, vec3 p) { return textureLod(s, p.xy, 0.0).r; }",
+						"float compareDepth(sampler2DShadow s, vec3 p) { return sampleDepth(s, p); }",
+						"void main() { vec3 p = vec3(0.5); imageStore(colorimg, ivec2(gl_GlobalInvocationID.xy),",
+						"vec4(compareDepth(shadowtex0, p), sampleDepth(depthtex0, p), 0.0, 1.0)); }"),
+				null, null, List.of(check("both overloads and the nested comparison call compile", r ->
+						r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_sampleDepth_0")
+						&& !r.sources().get(PatchShaderType.COMPUTE).contains("aeth_s_compareDepth_0")
+						&& r.sources().get(PatchShaderType.COMPUTE).contains("aeth_shadowFiltered")))));
 		out.add(fullscreen("compatibility-era shadow2D",
 				glsl("#version 120", "varying vec2 texcoord;", "void main() { gl_Position = ftransform(); texcoord = gl_MultiTexCoord0.st; }"),
 				glsl("#version 120", "uniform sampler2DShadow shadow;", "varying vec2 texcoord;",
@@ -415,6 +608,17 @@ final class LoweringFixtures {
 				glsl("#version 330 core", "uniform sampler2D tex;", "in vec2 uv;", "in vec4 tint;", "layout(location = 0) out vec4 color;",
 						"vec2 shift(vec2 tex) { return tex + 0.5; }", "void main() { color = texture(tex, shift(uv)) * tint; }"),
 				check("sampler renamed, parameter kept", r -> r.has(F, "sampler set=0 Sampler0") && r.sources().get(F).contains("return tex + "))));
+		out.add(world("sampled colour shadows its sampler after the initializer (world)", WORLD_VERTEX, null,
+				glsl("#version 330 core", "uniform sampler2D tex;", "in vec2 uv;", "layout(location = 0) out vec4 color;",
+						"void main() { vec4 tex = textureGrad(tex, uv, dFdx(uv), dFdy(uv)); tex.rgb *= 0.5; color = tex; }"),
+				check("initializer samples Sampler0, subsequent reads use the local colour", r -> r.has(F, "sampler set=0 Sampler0")
+						&& r.sources().get(F).contains("textureGrad(Sampler0,") && r.sources().get(F).contains("tex.rgb *= "))));
+		out.add(world("sampler shadows end at their block and loop (world)", WORLD_VERTEX, null,
+				glsl("#version 330 core", "uniform sampler2D tex;", "in vec2 uv;", "layout(location = 0) out vec4 color;",
+						"void main() { vec4 acc = texture(tex, uv); { vec4 tex = textureLod(tex, uv, 0.0); acc += tex; }",
+						"for (int tex = 0; tex < 2; tex++) { acc *= float(tex + 1); } color = acc + texture(tex, uv); }"),
+				check("global sampler restored after nested scopes; loop counter left local", r -> r.has(F, "sampler set=0 Sampler0")
+						&& r.sources().get(F).contains("textureLod(Sampler0,") && r.sources().get(F).contains("int tex = 0"))));
 		out.add(world("fragment depth and gl_FragCoord in a global (world)", WORLD_VERTEX, null,
 				glsl("#version 330 core", "in vec2 uv;", "in vec4 tint;", "layout(location = 0) out vec4 color;", "ivec2 texel = ivec2(gl_FragCoord.xy);",
 						"float depth0 = gl_FragCoord.z;",
@@ -555,6 +759,27 @@ final class LoweringFixtures {
 				"out DATA { vec2 uv; vec4 tint; flat int id; } data_out;",
 				"void main() { int i; for (i = 0; i < 3; i++) { vec4 vertex = gl_in[i].gl_Position; " + between + " gl_Position = vertex;",
 				"data_out.uv = data_in[i].uv; data_out.tint = data_in[i].tint; data_out.id = data_in[i].id; EmitVertex(); } EndPrimitive(); }");
+		out.add(new Fixture("geometry interface blocks split on both sides", Kind.WORLD, blockVertex,
+				blockGeometry.apply("if (i >= data_in.length()) return;"), blockFragment, List.of(
+				check("geometry member arrays match adjacent stages without struct interfaces", r -> r.sources().containsKey(G)
+						&& r.location(V, "out", "aeth_io_vertex_DATA_uv") >= 0
+						&& r.location(V, "out", "aeth_io_vertex_DATA_uv") == r.location(G, "in", "aeth_io_vertex_DATA_uv")
+						&& r.location(G, "out", "aeth_io_geometry_DATA_uv") == r.location(F, "in", "aeth_io_geometry_DATA_uv")
+						&& r.lines().values().stream().flatMap(List::stream)
+								.noneMatch(l -> (l.startsWith("in ") || l.startsWith("out ")) && l.contains(" t15x"))))));
+		out.add(new Fixture("geometry interface block array members keep their location ranges", Kind.WORLD,
+				glsl("#version 430 core", "in vec3 vaPosition;", "out DATA { vec4 tint[2]; float weight; } data_out;",
+						"void main() { gl_Position = vec4(vaPosition, 1); data_out.tint[0] = vec4(vaPosition, 1);",
+						"data_out.tint[1] = vec4(1); data_out.weight = 0.5; }"),
+				glsl("#version 430 core", "layout(triangles) in;", "layout(triangle_strip, max_vertices = 3) out;",
+						"in DATA { vec4 tint[2]; float weight; } data_in[];", "out DATA { vec4 tint[2]; float weight; } data_out;",
+						"void main() { for (int i = 0; i < data_in.length(); i++) { gl_Position = gl_in[i].gl_Position;",
+						"data_out.tint = data_in[i].tint; data_out.weight = data_in[i].weight; EmitVertex(); } EndPrimitive(); }"),
+				glsl("#version 430 core", "in DATA { vec4 tint[2]; float weight; } data_in;", "layout(location = 0) out vec4 color;",
+						"void main() { color = (data_in.tint[0] + data_in.tint[1]) * data_in.weight; }"),
+				List.of(check("array members reserve two locations after the per-vertex dimension", r ->
+						r.location(G, "in", "aeth_io_vertex_DATA_weight") >= r.location(G, "in", "aeth_io_vertex_DATA_tint") + 2
+						&& r.location(G, "out", "aeth_io_geometry_DATA_weight") == r.location(F, "in", "aeth_io_geometry_DATA_weight")))));
 		out.add(new Fixture("metal: pass-through geometry stage with varying blocks folded", Kind.WORLD_METAL, blockVertex, blockGeometry.apply(""),
 				blockFragment, List.of(
 				check("no geometry stage; the fragment reads the vertex outputs", r -> !r.sources().containsKey(PatchShaderType.GEOMETRY)
@@ -609,6 +834,37 @@ final class LoweringFixtures {
 				}),
 				metalTranslates())));
 		return out;
+	}
+
+	private static Fixture geometryLocations() {
+		StringBuilder vertex = new StringBuilder("#version 330 core\nin vec3 vaPosition;\n");
+		StringBuilder geometry = new StringBuilder("#version 330 core\nlayout(triangles) in; layout(triangle_strip, max_vertices=3) out;\n");
+		StringBuilder fragment = new StringBuilder("#version 330 core\nout vec4 color;\n");
+		for (int i = 0; i < 20; i++) {
+			vertex.append("out float vi").append(i).append(";\n");
+			geometry.append("in float vi").append(i).append("[]; out float go").append(i).append(";\n");
+			fragment.append("in float go").append(i).append(";\n");
+		}
+		vertex.append("void main() { gl_Position=vec4(vaPosition, 1); ");
+		geometry.append("void main() { for(int corner=0; corner<3; corner++) { gl_Position=gl_in[corner].gl_Position; ");
+		fragment.append("void main() { color=vec4(");
+		for (int i = 0; i < 20; i++) {
+			vertex.append("vi").append(i).append('=').append(i).append(".0; ");
+			geometry.append("go").append(i).append("=vi").append(i).append("[corner]; ");
+			fragment.append(i == 0 ? "" : "+").append("go").append(i);
+		}
+		vertex.append("}\n"); geometry.append("EmitVertex(); } EndPrimitive(); }\n"); fragment.append("); }\n");
+		return world("geometry inputs and outputs reuse their independent location ranges", vertex.toString(), geometry.toString(), fragment.toString(),
+				check("both edges matched and within the output-component limit", r -> {
+					for (int i = 0; i < 20; i++) {
+						if (r.location(V, "out", "vi" + i) != r.location(G, "in", "vi" + i)
+								|| r.location(G, "out", "go" + i) != r.location(F, "in", "go" + i)
+								|| r.location(G, "out", "go" + i) >= 29) {
+							return false;
+						}
+					}
+					return true;
+				}));
 	}
 
 	/** Declarations in other formats than their images' ({@code ImageViews}). */

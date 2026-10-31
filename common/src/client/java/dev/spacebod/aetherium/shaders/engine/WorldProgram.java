@@ -18,6 +18,7 @@ import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.api.vertex.VertexFormat;
 import dev.spacebod.aetherium.client.gpu.GeometryStages;
+import dev.spacebod.aetherium.client.gpu.PackRenderPipeline;
 import dev.spacebod.aetherium.shaders.AetheriumShaders;
 import dev.spacebod.aetherium.shaders.chunks.ChunkMeshFormat;
 import dev.spacebod.aetherium.shaders.compat.lod.LodUniforms;
@@ -296,12 +297,9 @@ public final class WorldProgram implements AutoCloseable {
 		int writeMask = vanillaTarget == null ? ColorTargetState.WRITE_ALL : vanillaTarget.writeMask();
 		int[] attachments = layout.attachments();
 		ColorTargetState[] targets = PipelineState.colorTargets(attachments, layout::format, drawBuffers, source.getDirectives(), vanillaBlend, writeMask);
-		for (int a = 0; a < targets.length; a++) {
-			builder.withColorTargetState(a, targets[a]);
-		}
 		int first = drawBuffers.length == 0 ? -1 : indexOf(attachments, drawBuffers[0]);
 		Optional<BlendFunction> blend = first < 0 || targets[first] == null ? Optional.empty() : targets[first].blendFunction();
-		RenderPipeline pipeline = builder.build();
+		RenderPipeline pipeline = PackRenderPipeline.build(builder, targets);
 
 		Map<PatchShaderType, String> stages = new EnumMap<>(prepared.stages());
 		// Never `invariant gl_Position` on one program alone: it changes how that program computes positions, and coplanar

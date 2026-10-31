@@ -20,6 +20,11 @@ public interface LocationalUniformHolder extends UniformHolder {
 
 	OptionalInt location(String name, UniformType type);
 
+	/** Upload type for a provider; a holder may adapt scalar providers to the program's declaration. */
+	default UniformType uniformType(String name, UniformType provided) {
+		return provided;
+	}
+
 	@Override
 	default LocationalUniformHolder uniform1f(UniformUpdateFrequency updateFrequency, String name, FloatSupplier value) {
 		location(name, UniformType.FLOAT).ifPresent(id -> addUniform(updateFrequency, new FloatUniform(id, value)));

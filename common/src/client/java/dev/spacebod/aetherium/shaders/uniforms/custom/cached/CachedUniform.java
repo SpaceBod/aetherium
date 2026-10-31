@@ -6,6 +6,7 @@ import kroppeb.stareval.function.FunctionContext;
 import kroppeb.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 import dev.spacebod.aetherium.shaders.gl.uniform.UniformUpdateFrequency;
+import dev.spacebod.aetherium.shaders.gl.uniform.UniformType;
 import dev.spacebod.aetherium.shaders.parsing.VectorType;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
@@ -69,6 +70,11 @@ public abstract class CachedUniform implements VariableExpression {
 	protected abstract boolean doUpdate();
 
 	public abstract void push(int location);
+
+	/** Uploads a cached value using the type selected when the program was registered. */
+	public void push(int location, UniformType type) {
+		push(location);
+	}
 
 	@Override
 	public void evaluateTo(FunctionContext context, FunctionReturn functionReturn) {

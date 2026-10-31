@@ -29,6 +29,7 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import dev.spacebod.aetherium.shaders.AetheriumShaders;
+import dev.spacebod.aetherium.client.gpu.PackRenderPipeline;
 import dev.spacebod.aetherium.shaders.gl.framebuffer.ViewportData;
 import dev.spacebod.aetherium.shaders.gl.state.FogMode;
 import dev.spacebod.aetherium.shaders.pipeline.transform.PatchShaderType;
@@ -148,12 +149,11 @@ public final class CompositePass implements AutoCloseable {
 				ColorTargetState.WRITE_ALL);
 		Set<Integer> blended = new TreeSet<>();
 		for (int i = 0; i < colorTargets.length; i++) {
-			builder.withColorTargetState(i, colorTargets[i]);
 			if (colorTargets[i].blendFunction().isPresent()) {
 				blended.add(drawBuffers[i]);
 			}
 		}
-		RenderPipeline pipeline = builder.build();
+		RenderPipeline pipeline = PackRenderPipeline.build(builder, colorTargets);
 
 		ShaderSource shaderSource = new ShaderSource() {
 			@Override

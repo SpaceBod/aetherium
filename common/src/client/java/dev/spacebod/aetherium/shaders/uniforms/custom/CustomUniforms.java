@@ -2,8 +2,9 @@ package dev.spacebod.aetherium.shaders.uniforms.custom;
 
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntMaps;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMaps;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -19,6 +20,7 @@ import kroppeb.stareval.resolver.ExpressionResolver;
 import dev.spacebod.aetherium.shaders.AetheriumShaders;
 import dev.spacebod.aetherium.shaders.gl.uniform.LocationalUniformHolder;
 import dev.spacebod.aetherium.shaders.gl.uniform.UniformHolder;
+import dev.spacebod.aetherium.shaders.gl.uniform.UniformType;
 import dev.spacebod.aetherium.shaders.parsing.ExpressionFunctions;
 import dev.spacebod.aetherium.shaders.parsing.ExpressionOperators;
 import dev.spacebod.aetherium.shaders.parsing.VectorType;
@@ -41,11 +43,12 @@ import java.util.stream.Collectors;
  * frame. Variables are visible to programs like uniforms.
  */
 public class CustomUniforms implements FunctionContext {
+	private record Binding(int location, UniformType type) { }
 	private final Map<String, CachedUniform> variables = new Object2ObjectLinkedOpenHashMap<>();
 	private final Map<String, Expression> variablesExpressions = new Object2ObjectLinkedOpenHashMap<>();
 	private final CustomUniformFixedInputUniformsHolder inputHolder;
 	private final List<CachedUniform> uniformOrder;
-	private final Map<Object, Object2IntMap<CachedUniform>> locationMap = new Object2ObjectOpenHashMap<>();
+	private final Map<Object, Object2ObjectMap<CachedUniform, Binding>> locationMap = new Object2ObjectOpenHashMap<>();
 	private final Map<CachedUniform, List<CachedUniform>> dependsOn;
 	/** The reverse of {@link #dependsOn}: which uniforms read each one. */
 	private final Map<CachedUniform, List<CachedUniform>> requiredBy;
@@ -202,12 +205,13 @@ public class CustomUniforms implements FunctionContext {
 	}
 
 	public void assignTo(LocationalUniformHolder targetHolder) {
-		Object2IntMap<CachedUniform> locations = new Object2IntOpenHashMap<>();
+		Object2ObjectMap<CachedUniform, Binding> locations = new Object2ObjectOpenHashMap<>();
 		for (CachedUniform uniform : this.uniformOrder) {
 			try {
-				OptionalInt location = targetHolder.location(uniform.getName(), Type.convert(uniform.getType()));
+				UniformType type = targetHolder.uniformType(uniform.getName(), Type.convert(uniform.getType()));
+				OptionalInt location = targetHolder.location(uniform.getName(), type);
 				if (location.isPresent()) {
-					locations.put(uniform, location.getAsInt());
+					locations.put(uniform, new Binding(location.getAsInt(), type));
 				}
 			} catch (RuntimeException e) {
 				AetheriumShaders.logger.error("the custom uniform {} cannot be bound: {}", uniform.getName(), e.getMessage());
@@ -304,11 +308,11 @@ public class CustomUniforms implements FunctionContext {
 	}
 
 	public void push(Object pass) {
-		Object2IntMap<CachedUniform> uniforms = this.locationMap.get(pass);
+		Object2ObjectMap<CachedUniform, Binding> uniforms = this.locationMap.get(pass);
 		if (uniforms != null) {
-			// Primitive iteration: forEach(BiConsumer) boxes every location.
-			for (Object2IntMap.Entry<CachedUniform> e : Object2IntMaps.fastIterable(uniforms)) {
-				e.getKey().push(e.getIntValue());
+			for (Object2ObjectMap.Entry<CachedUniform, Binding> e : Object2ObjectMaps.fastIterable(uniforms)) {
+				Binding binding = e.getValue();
+				e.getKey().push(binding.location(), binding.type());
 			}
 		}
 	}

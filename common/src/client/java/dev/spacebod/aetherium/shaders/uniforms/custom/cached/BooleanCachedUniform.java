@@ -4,6 +4,7 @@ import dev.spacebod.aetherium.shaders.gl.ShaderRenderSystem;
 import kroppeb.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 import dev.spacebod.aetherium.shaders.gl.uniform.UniformUpdateFrequency;
+import dev.spacebod.aetherium.shaders.gl.uniform.UniformType;
 
 import java.util.function.BooleanSupplier;
 
@@ -27,6 +28,15 @@ public class BooleanCachedUniform extends CachedUniform {
 	@Override
 	public void push(int location) {
 		ShaderRenderSystem.uniform1i(location, this.cached ? 1 : 0);
+	}
+
+	@Override
+	public void push(int location, UniformType type) {
+		if (type == UniformType.FLOAT) {
+			ShaderRenderSystem.uniform1f(location, this.cached ? 1.0f : 0.0f);
+		} else {
+			push(location);
+		}
 	}
 
 	@Override

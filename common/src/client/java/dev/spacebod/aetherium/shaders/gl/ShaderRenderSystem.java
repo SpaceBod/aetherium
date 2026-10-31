@@ -136,8 +136,8 @@ public final class ShaderRenderSystem {
 		return false;
 	}
 
-	/** Buffer blending per draw buffer is part of vanilla pipelines' colour-target state on both backends. */
+	/** Independent draw-buffer blending requires the device feature enabled for shader-pack pipelines. */
 	public static boolean supportsBufferBlending() {
-		return true;
+		return StorageFeatures.has(StorageFeatures.INDEPENDENT_BLEND);
 	}
 }

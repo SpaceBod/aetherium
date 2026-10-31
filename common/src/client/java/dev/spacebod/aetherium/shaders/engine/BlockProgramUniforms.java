@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minecraft.client.Minecraft;
@@ -73,6 +75,42 @@ public final class BlockProgramUniforms implements DynamicLocationalUniformHolde
 			case ONCE -> once.add(uniform);
 			case PER_TICK -> perTick.add(uniform);
 			case PER_FRAME -> perFrame.add(uniform);
+		}
+		return this;
+	}
+
+	@Override
+	public UniformType uniformType(String name, UniformType provided) {
+		UniformBlock.Member member = members.get(name);
+		return provided == UniformType.INT && member != null && member.type().equals("float") ? UniformType.FLOAT : provided;
+	}
+
+	@Override
+	public BlockProgramUniforms uniform1i(UniformUpdateFrequency frequency, String name, IntSupplier value) {
+		if (uniformType(name, UniformType.INT) == UniformType.FLOAT) {
+			uniform1f(frequency, name, value);
+		} else {
+			DynamicLocationalUniformHolder.super.uniform1i(frequency, name, value);
+		}
+		return this;
+	}
+
+	@Override
+	public BlockProgramUniforms uniform1b(UniformUpdateFrequency frequency, String name, BooleanSupplier value) {
+		if (uniformType(name, UniformType.INT) == UniformType.FLOAT) {
+			uniform1f(frequency, name, (IntSupplier) () -> value.getAsBoolean() ? 1 : 0);
+		} else {
+			DynamicLocationalUniformHolder.super.uniform1b(frequency, name, value);
+		}
+		return this;
+	}
+
+	@Override
+	public BlockProgramUniforms uniform1i(String name, IntSupplier value, ValueUpdateNotifier notifier) {
+		if (uniformType(name, UniformType.INT) == UniformType.FLOAT) {
+			uniform1f(name, value, notifier);
+		} else {
+			DynamicLocationalUniformHolder.super.uniform1i(name, value, notifier);
 		}
 		return this;
 	}
@@ -189,7 +227,8 @@ public final class BlockProgramUniforms implements DynamicLocationalUniformHolde
 	}
 
 	private static long currentTick() {
-		return Minecraft.getInstance().level == null ? 0L : Minecraft.getInstance().level.getGameTime();
+		Minecraft mc = Minecraft.getInstance();
+		return mc == null || mc.level == null ? 0L : mc.level.getGameTime();
 	}
 
 	private static boolean compatible(UniformType provided, String glslType) {

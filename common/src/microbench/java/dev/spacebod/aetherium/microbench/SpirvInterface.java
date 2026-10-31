@@ -5,7 +5,10 @@ import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.TreeSet;
+import dev.spacebod.aetherium.shaders.pipeline.transform.PatchShaderType;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.util.spvc.Spvc;
@@ -20,6 +23,8 @@ import org.lwjgl.util.spvc.SpvcReflectedResource;
  */
 final class SpirvInterface {
 	private static final int DECORATION_LOCATION = 30;
+	private static final int DECORATION_FLAT = 14;
+	private static final int DECORATION_NO_PERSPECTIVE = 13;
 	private static final int DECORATION_BINDING = 33;
 	private static final int DECORATION_SET = 34;
 
@@ -73,6 +78,14 @@ final class SpirvInterface {
 					}
 				}
 				line.append(name).append(' ').append(type(compiler, r.type_id()));
+				if (kind.equals("in") || kind.equals("out")) {
+					if (Spvc.spvc_compiler_has_decoration(compiler, r.id(), DECORATION_FLAT)) {
+						line.append(" flat");
+					}
+					if (Spvc.spvc_compiler_has_decoration(compiler, r.id(), DECORATION_NO_PERSPECTIVE)) {
+						line.append(" noperspective");
+					}
+				}
 				if (kind.equals("sampler") && Spvc.spvc_type_get_image_is_depth(Spvc.spvc_compiler_get_type_handle(compiler, r.base_type_id()))) {
 					line.append(" depth"); // a depth-comparison image (sampler2DShadow)
 				}
@@ -82,6 +95,29 @@ final class SpirvInterface {
 				lines.add(line.toString());
 			}
 		}
+	}
+
+	/** The frontend checks interpolation across stages after compiling each module separately. */
+	static String interpolationMismatch(Map<PatchShaderType, List<String>> stages) {
+		var producer = stages.getOrDefault(stages.containsKey(PatchShaderType.GEOMETRY) ? PatchShaderType.GEOMETRY : PatchShaderType.VERTEX, List.of());
+		Map<String, String> outputs = new HashMap<>();
+		for (String line : producer) {
+			if (line.startsWith("out ")) {
+				outputs.put(line.split(" ")[1], line);
+			}
+		}
+		for (String input : stages.getOrDefault(PatchShaderType.FRAGMENT, List.of())) {
+			if (!input.startsWith("in ")) {
+				continue;
+			}
+			String location = input.split(" ")[1];
+			String output = outputs.get(location);
+			if (output != null && (input.endsWith(" flat") != output.endsWith(" flat")
+					|| input.endsWith(" noperspective") != output.endsWith(" noperspective"))) {
+				return "mismatched interpolation at " + location + ": " + output + " / " + input;
+			}
+		}
+		return null;
 	}
 
 	private static String members(long compiler, int baseTypeId, MemoryStack stack) {
