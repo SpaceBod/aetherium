@@ -97,6 +97,9 @@ public class ExpressionFunctions {
 				ExpressionFunctions.addBinaryOpJOML("multiply", VectorType.VEC2, Vector2f::mul);
 				ExpressionFunctions.addBinaryOpJOML("multiply", VectorType.VEC3, Vector3f::mul);
 				ExpressionFunctions.addBinaryOpJOML("multiply", VectorType.VEC4, Vector4f::mul);
+				// Custom uniform expressions can multiply a scalar by a vector in either order.
+				addComponentWise("multiply", new boolean[]{false, true}, args -> args[0] * args[1]);
+				addComponentWise("multiply", new boolean[]{true, false}, args -> args[0] * args[1]);
 			}
 
 			{
@@ -231,6 +234,8 @@ public class ExpressionFunctions {
 				ExpressionFunctions.addUnaryOpJOML("ceil", VectorType.VEC4, Vector4f::ceil);
 
 				ExpressionFunctions.<F2FFunction>add("frac", (a) -> (float) (a - Math.floor(a)));
+				ExpressionFunctions.<F2FFunction>add("fract", (a) -> (float) (a - Math.floor(a)));
+				addComponentWise("fract", new boolean[]{false}, args -> (float) (args[0] - Math.floor(args[0])));
 
 				// Halves round up (towards positive infinity).
 				ExpressionFunctions.<F2FFunction>add("round", (a) -> (float) Math.floor(a + 0.5f));

@@ -2301,7 +2301,7 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 			}
 		}
 		programs.get(ProgramId.Final).ifPresent(source -> source.getDirectives().getMipmappedBuffers().forEach(targets::markMipmapped));
-		layout = GbufferLayout.of(programs, targets);
+		layout = GbufferLayout.of(programs, targets, LodCompat.hasRenderingEnabled());
 		// size.buffer.colortexN, except for targets world programs draw into (one size per render pass).
 		targets.setSizes(directives, layout.attachments());
 		StringBuilder kept = new StringBuilder();

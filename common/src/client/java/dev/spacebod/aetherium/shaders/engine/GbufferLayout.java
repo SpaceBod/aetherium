@@ -45,13 +45,16 @@ public final class GbufferLayout implements TargetLayout {
 		return sampledAny.contains(target);
 	}
 
-	public static GbufferLayout of(ProgramSet programs, PackTargets targets) {
+	public static GbufferLayout of(ProgramSet programs, PackTargets targets, boolean lodEnabled) {
 		TreeSet<Integer> union = new TreeSet<>();
 		TreeSet<Integer> sampledTargets = new TreeSet<>();
 		boolean depth = false;
 		for (ProgramId id : ProgramId.values()) {
 			// LOD terrain and objects (dh_terrain, dh_water, dh_generic) draw into the same world passes' attachments; dh_shadow into the shadow map.
 			boolean lod = id == ProgramId.DhTerrain || id == ProgramId.DhWater || id == ProgramId.DhGeneric;
+			if (lod && !lodEnabled) {
+				continue;
+			}
 			if (id.getGroup() != ProgramGroup.Gbuffers && !lod) {
 				continue;
 			}

@@ -2,6 +2,7 @@ package dev.spacebod.aetherium.shaders.engine;
 
 import dev.spacebod.aetherium.shaders.shaderpack.loading.ProgramArrayId;
 import dev.spacebod.aetherium.shaders.shaderpack.loading.ProgramId;
+import dev.spacebod.aetherium.shaders.shaderpack.programs.ComputeSource;
 import dev.spacebod.aetherium.shaders.shaderpack.programs.ProgramSet;
 import dev.spacebod.aetherium.shaders.shaderpack.programs.ProgramSource;
 import java.util.HashSet;
@@ -12,7 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Every sampler name any program of the pack declares (world, shadow and full-screen programs), so per-frame work that
+ * Every sampler name any program of the pack declares (world, shadow, full-screen and compute programs), so per-frame work that
  * only feeds a sampler (a depth conversion, the shadowtex1 copy) can be skipped when nothing reads it. Declared is not
  * the same as read, so this over-includes, which is the safe direction.
  */
@@ -47,14 +48,28 @@ public final class SamplerUsage {
 		for (ProgramId id : ProgramId.values()) {
 			programs.get(id).ifPresent(source -> scan(source, names));
 		}
+		scan(programs.getSetup(), names);
+		scan(programs.getShadowCompute(), names);
+		scan(programs.getFinalCompute(), names);
 		for (ProgramArrayId stage : ProgramArrayId.values()) {
 			for (ProgramSource source : programs.getComposite(stage)) {
 				if (source != null) {
 					scan(source, names);
 				}
 			}
+			for (ComputeSource[] sources : programs.getCompute(stage)) {
+				scan(sources, names);
+			}
 		}
 		return new SamplerUsage(names);
+	}
+
+	private static void scan(ComputeSource[] sources, Set<String> names) {
+		for (ComputeSource source : sources) {
+			if (source != null) {
+				source.getSource().ifPresent(text -> names.addAll(declaredSamplers(text)));
+			}
+		}
 	}
 
 	private static void scan(ProgramSource source, Set<String> names) {

@@ -97,7 +97,9 @@ public class PropertiesPreprocessor {
 
 		// Trim lines so whitespace after a line-continuation backslash doesn't break it (needed by Voyager Shader).
 		// Non-directive '#' lines are comments in .properties and are dropped.
-		source = Arrays.stream(source.split("\\R")).map(String::trim).filter(s -> !s.isBlank())
+		// ID maps may be decoded as Latin-1. UTF-8 comment bytes can then contain U+0085, which is data rather
+		// than a line ending; splitting on \\R would expose the rest of the comment to the C preprocessor.
+		source = Arrays.stream(source.split("\\r\\n|\\r|\\n")).map(String::trim).filter(s -> !s.isBlank())
 			.map(line -> {
 				if (line.startsWith("#")) {
 					for (PreprocessorCommand command : PreprocessorCommand.values()) {

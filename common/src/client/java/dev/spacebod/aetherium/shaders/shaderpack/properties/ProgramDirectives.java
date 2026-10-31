@@ -21,9 +21,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ProgramDirectives {
 	private static final ImmutableList<String> LEGACY_RENDER_TARGETS = PackRenderTargetDirectives.LEGACY_RENDER_TARGETS;
+	private static final Pattern COMMENTS = Pattern.compile("/\\*.*?\\*/|//[^\\r\\n]*", Pattern.DOTALL);
+	private static final Pattern FRAGMENT_OUTPUT = Pattern.compile("\\b(?:gl_FragColor|gl_FragData|out)\\b");
+	private static final Pattern SECOND_LEGACY_OUTPUT = Pattern.compile("\\bgl_FragData\\s*\\[\\s*1\\s*]");
+	private static final Pattern OUTPUT_STORAGE = Pattern.compile("\\bout\\b");
+	private static final Pattern OUTPUT_LOCATION = Pattern.compile("\\blocation\\s*=\\s*(\\d+)\\s*(?:[,)]|$)");
+	private static final Pattern OUTPUT_LAYOUT = Pattern.compile("\\blayout\\s*\\([^)]*\\)");
+	private static final Pattern OUTPUT_NAME = Pattern.compile("\\b(\\w+)\\s*(?:\\[\\s*(\\d+)\\s*])?\\s*$");
 
 	private final int[] drawBuffers;
 	private final ViewportData viewportScale;
@@ -52,7 +61,8 @@ public class ProgramDirectives {
 	public ProgramDirectives(ProgramSource source, ShaderProperties properties, Set<Integer> supportedRenderTargets,
 							 @Nullable BlendModeOverride defaultBlendOverride) {
 		// DRAWBUFFERS/RENDERTARGETS are only read from the fragment shader; whichever appears last wins.
-		// Without either, /* DRAWBUFFERS:0 */ is assumed. SEUS v08/v10 need 01234567, but that breaks TAA in
+		// Without either, colour programs assume 0; shadow programs include 1 only if a second output exists.
+		// SEUS v08/v10 need 01234567 for world programs, but that breaks TAA in
 		// Sildur's Vibrant Shaders (gbuffers_skybasic has no directive and would write garbage to colortex7).
 		Optional<CommentDirective> optionalDrawbuffersDirective = findDrawbuffersDirective(source.getFragmentSource());
 		Optional<CommentDirective> optionalRendertargetsDirective = findRendertargetsDirective(source.getFragmentSource());
@@ -68,7 +78,16 @@ public class ProgramDirectives {
 			}
 		}).orElseGet(() -> {
 			unknownDrawBuffers = true;
-			return new int[]{0};
+			String fragment = source.getFragmentSource().orElse("");
+			String name = source.getName();
+			boolean shadow = name.equals("shadow") || name.startsWith("shadow_") || name.equals("dh_shadow");
+			boolean world = shadow || name.startsWith("gbuffers_") || name.startsWith("dh_");
+			// World placeholders must not reserve a phantom attachment and displace a real output.
+			// Full-screen passes keep target 0: the frame loop uses their first target for sizing.
+			if (world && !hasFragmentOutput(fragment)) {
+				return new int[0];
+			}
+			return shadow && hasSecondFragmentOutput(fragment) ? new int[]{0, 1} : new int[]{0};
 		});
 
 		if (properties != null) {
@@ -115,6 +134,53 @@ public class ProgramDirectives {
 		});
 
 		this.mipmappedBuffers = ImmutableSet.copyOf(mipmappedBuffers);
+	}
+
+	public static boolean hasFragmentOutput(String source) {
+		return FRAGMENT_OUTPUT.matcher(COMMENTS.matcher(source).replaceAll(" ")).find();
+	}
+
+	/** Recognize a second colour output without treating function out-parameters as render targets. */
+	private static boolean hasSecondFragmentOutput(String source) {
+		String code = COMMENTS.matcher(source).replaceAll(" ");
+		if (SECOND_LEGACY_OUTPUT.matcher(code).find()) {
+			return true;
+		}
+		boolean first = false;
+		int implicit = 0;
+		for (String statement : code.split("[;{}]")) {
+			Matcher output = OUTPUT_STORAGE.matcher(statement);
+			if (!output.find()) {
+				continue;
+			}
+			String before = statement.substring(0, output.start());
+			if (before.lastIndexOf('(') > before.lastIndexOf(')')) {
+				continue;
+			}
+			Matcher location = OUTPUT_LOCATION.matcher(statement);
+			String explicit = location.find() ? location.group(1) : null;
+			String names = OUTPUT_LAYOUT.matcher(statement.substring(output.end())).replaceAll(" ");
+			for (String declarator : names.split(",")) {
+				Matcher name = OUTPUT_NAME.matcher(declarator);
+				if (!name.find()) {
+					continue;
+				}
+				boolean array = name.group(2) != null && !name.group(2).equals("1");
+				if (explicit != null) {
+					if (explicit.equals("1") || explicit.equals("0") && array) {
+						return true;
+					}
+					first |= explicit.equals("0");
+				} else if (name.group(1).equals("outColor1") || name.group(1).equals("outColor0") && array) {
+					return true;
+				} else if (name.group(1).equals("outColor0")) {
+					first = true;
+				} else if (!name.group(1).matches("outColor[2-7]")) {
+					implicit += array ? 2 : 1;
+				}
+			}
+		}
+		return implicit >= (first ? 1 : 2);
 	}
 
 	private static Optional<CommentDirective> findDrawbuffersDirective(Optional<String> stageSource) {

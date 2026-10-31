@@ -209,7 +209,10 @@ public class ShaderPack {
 			activeFeatures.add(FeatureFlags.getValue(shaderProperties.getRequiredFeatureFlags().get(i)));
 		}
 		for (int i = 0; i < shaderProperties.getOptionalFeatureFlags().size(); i++) {
-			activeFeatures.add(FeatureFlags.getValue(shaderProperties.getOptionalFeatureFlags().get(i)));
+			FeatureFlags feature = FeatureFlags.getValue(shaderProperties.getOptionalFeatureFlags().get(i));
+			if (feature.isUsable()) {
+				activeFeatures.add(feature);
+			}
 		}
 
 		if (!activeFeatures.contains(FeatureFlags.SSBO) && !shaderProperties.getBufferObjects().isEmpty()) {

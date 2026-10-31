@@ -19,7 +19,9 @@ import net.minecraft.world.level.block.state.properties.Property;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 public class BlockMaterialMapping {
 	public static Object2IntMap<BlockState> createBlockStateIdMap(Int2ObjectLinkedOpenHashMap<List<BlockEntry>> blockPropertiesMap, Int2ObjectLinkedOpenHashMap<List<TagEntry>> tagPropertiesMap) {
@@ -99,7 +101,10 @@ public class BlockMaterialMapping {
 		Map<Block, BlockRenderType> blockTypeIds = new Reference2ReferenceOpenHashMap<>();
 
 		blockPropertiesMap.forEach((id, blockType) -> {
-			Identifier identifier = Identifier.fromNamespaceAndPath(id.getNamespace(), id.getName());
+			Identifier identifier = blockIdentifier(id);
+			if (identifier == null) {
+				return;
+			}
 
 			Block block = BuiltInRegistries.BLOCK.get(identifier).map(Holder::value).orElse(Blocks.AIR);
 
@@ -109,13 +114,20 @@ public class BlockMaterialMapping {
 		return blockTypeIds;
 	}
 
+	private static @Nullable Identifier blockIdentifier(NamespacedId id) {
+		// Some packs contain mixed-case typos in block.properties. Match Minecraft's lowercase registry IDs.
+		Identifier identifier = Identifier.tryParse((id.getNamespace() + ":" + id.getName()).toLowerCase(Locale.ROOT));
+		if (identifier == null) {
+			AetheriumShaders.logger.warn("Ignoring invalid block ID in block.properties: {}", id);
+		}
+		return identifier;
+	}
+
 	private static void addBlockStates(BlockEntry entry, Object2IntMap<BlockState> idMap, int intId) {
 		NamespacedId id = entry.id();
-		Identifier identifier;
-		try {
-			identifier = Identifier.fromNamespaceAndPath(id.getNamespace(), id.getName());
-		} catch (Exception exception) {
-			throw new IllegalStateException("Failed to get entry for " + intId, exception);
+		Identifier identifier = blockIdentifier(id);
+		if (identifier == null) {
+			return;
 		}
 
 		Block block = BuiltInRegistries.BLOCK.get(identifier).map(Holder::value).orElse(Blocks.AIR);

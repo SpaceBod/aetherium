@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import dev.spacebod.aetherium.shaders.AetheriumShaders;
 import dev.spacebod.aetherium.shaders.gl.ShaderRenderSystem;
+import dev.spacebod.aetherium.shaders.gl.ShaderLimits;
 import dev.spacebod.aetherium.shaders.gl.blending.AlphaTest;
 import dev.spacebod.aetherium.shaders.gl.blending.AlphaTestFunction;
 import dev.spacebod.aetherium.shaders.gl.blending.BlendMode;
@@ -500,11 +501,11 @@ public class ShaderProperties {
 		});
 
 		handlePassDirective("image.", key, value, (imageName) -> {
-			String[] parts = value.split(" ");
+			String[] parts = value.trim().split("\\s+");
 			String key2 = key.substring(6);
 
-			if (packCustomImages.size() > 15) {
-				AetheriumShaders.logger.error("Only up to 16 images are allowed, but tried to add another image! " + key);
+			if (packCustomImages.size() >= ShaderLimits.MAX_CUSTOM_IMAGES) {
+				AetheriumShaders.logger.error("Only up to {} custom images are allowed, but tried to add another image: {}", ShaderLimits.MAX_CUSTOM_IMAGES, key);
 				return;
 			}
 
