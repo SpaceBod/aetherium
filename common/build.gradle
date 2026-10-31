@@ -43,3 +43,5 @@ addTerrainRendererCompileOnly()
 dependencies {
 	microbenchRuntimeOnly "maven.modrinth:sodium:${project.sodium_version}-fabric"
 }
+
+microbenchTask('targetImageChecks', 'dev.spacebod.aetherium.shaders.engine.TargetImageFixtures', 'Checks target image formats and allocation flags')

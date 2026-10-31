@@ -4,6 +4,7 @@ import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.renderpearl.backend.vulkan.VulkanConst;
 import dev.spacebod.aetherium.client.gpu.VulkanAccess;
 import dev.spacebod.aetherium.shaders.AetheriumShaders;
+import dev.spacebod.aetherium.shaders.gl.texture.InternalTextureFormat;
 import dev.spacebod.aetherium.shaders.pipeline.transform.lowering.TargetImages;
 import dev.spacebod.aetherium.shaders.shaderpack.loading.ProgramArrayId;
 import dev.spacebod.aetherium.shaders.shaderpack.loading.ProgramId;
@@ -11,9 +12,11 @@ import dev.spacebod.aetherium.shaders.shaderpack.programs.ComputeSource;
 import dev.spacebod.aetherium.shaders.shaderpack.programs.ProgramSet;
 import dev.spacebod.aetherium.shaders.shaderpack.programs.ProgramSource;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import org.lwjgl.system.MemoryStack;
@@ -28,8 +31,11 @@ import org.lwjgl.vulkan.VkFormatProperties;
  * compression on some devices. Vanilla keeps every texture in GENERAL layout, so no layout changes are needed.
  */
 public final class TargetStorage {
+	private record Target(boolean shadow, int index) { }
+	private enum Creation { STORAGE, MUTABLE }
 	private static volatile boolean packUsesImages;
-	private static final ThreadLocal<Boolean> CREATING = ThreadLocal.withInitial(() -> Boolean.FALSE);
+	private static volatile Set<Target> mutableTargets = Set.of();
+	private static final ThreadLocal<Creation> CREATING = new ThreadLocal<>();
 	private static final Map<GpuFormat, Boolean> SUPPORTED = new ConcurrentHashMap<>();
 
 	private TargetStorage() {
@@ -37,6 +43,38 @@ public final class TargetStorage {
 
 	/** At pack load, before its targets are created: whether any program binds a target as an image. */
 	public static void configure(boolean usesImages) {
+		mutableTargets = Set.of();
+		packUsesImages = usesImages;
+	}
+
+	/** Only compute declarations that need another compatible format make their target mutable. */
+	public static void configure(boolean usesImages, ProgramSet programs) {
+		Set<Target> mutable = new HashSet<>();
+		if (usesImages) {
+			var directives = programs.getPackDirectives();
+			for (String source : computeSourceTexts(programs)) {
+				for (var declaration : TargetImageViews.formats(source).entrySet()) {
+					var name = TargetImages.matcher(declaration.getKey());
+					if (!name.matches()) {
+						continue;
+					}
+					boolean shadow = TargetImages.shadow(name);
+					int index = TargetImages.index(name);
+					InternalTextureFormat format;
+					if (shadow) {
+						var setting = directives.getShadowDirectives().getColorSamplingSettings().get(index);
+						format = setting == null ? InternalTextureFormat.RGBA : setting.getFormat();
+					} else {
+						var setting = directives.getRenderTargetDirectives().getRenderTargetSettings().get(index);
+						format = setting == null ? InternalTextureFormat.RGBA : setting.getInternalFormat();
+					}
+					if (TargetImageViews.needsView(PackTargets.gpuFormat(format), declaration.getValue())) {
+						mutable.add(new Target(shadow, index));
+					}
+				}
+			}
+		}
+		mutableTargets = Set.copyOf(mutable);
 		packUsesImages = usesImages;
 	}
 
@@ -46,23 +84,42 @@ public final class TargetStorage {
 
 	/** Creates a pack target; with storage usage when the pack binds targets as images. */
 	static <T> T create(Supplier<T> create) {
+		return create(Creation.STORAGE, create);
+	}
+
+	/** Both sides of a colour target use the format requirements found before texture allocation. */
+	static <T> T create(boolean shadow, int target, Supplier<T> create) {
+		return create(mutableTargets.contains(new Target(shadow, target)) ? Creation.MUTABLE : Creation.STORAGE, create);
+	}
+
+	private static <T> T create(Creation creation, Supplier<T> create) {
 		if (!packUsesImages) {
 			return create.get();
 		}
-		CREATING.set(Boolean.TRUE);
+		Creation previous = CREATING.get();
+		CREATING.set(creation);
 		try {
 			return create.get();
 		} finally {
-			CREATING.set(Boolean.FALSE);
+			if (previous == null) {
+				CREATING.remove();
+			} else {
+				CREATING.set(previous);
+			}
 		}
 	}
 
 	/** {@code VulkanConst.textureUsageToVk} RETURN: storage usage while a pack target is created, when the format allows. */
 	public static int adjust(int vkUsage, GpuFormat format) {
-		if (!CREATING.get()) {
+		if (CREATING.get() == null) {
 			return vkUsage;
 		}
 		return supports(format) ? vkUsage | VK10.VK_IMAGE_USAGE_STORAGE_BIT : vkUsage;
+	}
+
+	/** Pack targets can be accessed through same-size image views of another format. */
+	public static int imageFlags(int flags) {
+		return CREATING.get() == Creation.MUTABLE ? flags | VK10.VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT : flags;
 	}
 
 	private static boolean supports(GpuFormat format) {
@@ -100,13 +157,25 @@ public final class TargetStorage {
 		for (ProgramId id : ProgramId.values()) {
 			programs.get(id).ifPresent(sources::add);
 		}
-		List<ComputeSource[]> computes = new ArrayList<>();
 		for (ProgramArrayId stage : ProgramArrayId.values()) {
 			for (ProgramSource source : programs.getComposite(stage)) {
 				if (source != null) {
 					sources.add(source);
 				}
 			}
+		}
+		for (ProgramSource source : sources) {
+			for (Optional<String> text : List.of(source.getVertexSource(), source.getGeometrySource(), source.getFragmentSource())) {
+				text.ifPresent(out::add);
+			}
+		}
+		out.addAll(computeSourceTexts(programs));
+		return out;
+	}
+
+	private static List<String> computeSourceTexts(ProgramSet programs) {
+		List<ComputeSource[]> computes = new ArrayList<>();
+		for (ProgramArrayId stage : ProgramArrayId.values()) {
 			var staged = programs.getCompute(stage);
 			if (staged != null) {
 				computes.addAll(List.of(staged));
@@ -115,11 +184,7 @@ public final class TargetStorage {
 		computes.add(programs.getSetup());
 		computes.add(programs.getShadowCompute());
 		computes.add(programs.getFinalCompute());
-		for (ProgramSource source : sources) {
-			for (Optional<String> text : List.of(source.getVertexSource(), source.getGeometrySource(), source.getFragmentSource())) {
-				text.ifPresent(out::add);
-			}
-		}
+		List<String> out = new ArrayList<>();
 		for (var list : computes) {
 			if (list != null) {
 				for (var compute : list) {

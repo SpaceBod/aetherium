@@ -230,7 +230,7 @@ public final class PackTargets implements AutoCloseable {
 				int s = side;
 				GpuFormat format = formats[i];
 				int fw = w, fh = h;
-				textures[i][side] = TargetStorage.create(() -> device.createTexture(() -> "Aetherium Shaders colortex" + target + (s == 0 ? "" : " alt"), USAGE, format, fw, fh, 1, levels));
+				textures[i][side] = TargetStorage.create(false, target, () -> device.createTexture(() -> "Aetherium Shaders colortex" + target + (s == 0 ? "" : " alt"), USAGE, format, fw, fh, 1, levels));
 				// Level 0 alone: render attachments must be one level; reads before the chain exists see level 0 only.
 				views[i][side] = device.createTextureView(textures[i][side], 0, 1);
 				if (levels > 1) {
@@ -617,8 +617,8 @@ public final class PackTargets implements AutoCloseable {
 
 	/** A size x size RGBA8 texture filled with {@code abgr} (R in the low byte). */
 	private static GpuTexture solid(String name, int abgr, int size) {
-		GpuTexture texture = RenderSystem.getDevice().createTexture(() -> "Aetherium Shaders " + name,
-				GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST, GpuFormat.RGBA8_UNORM, size, size, 1, 1);
+		GpuTexture texture = TargetStorage.create(() -> RenderSystem.getDevice().createTexture(() -> "Aetherium Shaders " + name,
+				GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST, GpuFormat.RGBA8_UNORM, size, size, 1, 1));
 		ByteBuffer pixels = MemoryUtil.memAlloc(4 * size * size);
 		try {
 			for (int i = 0; i < size * size; i++) {

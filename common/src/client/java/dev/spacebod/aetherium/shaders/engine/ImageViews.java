@@ -214,7 +214,7 @@ public final class ImageViews {
 	}
 
 	/** The format qualifier in a declaration's {@code layout(...)}, lower case, or null. */
-	private static @Nullable String declaredFormat(String statement) {
+	public static @Nullable String declaredFormat(String statement) {
 		Matcher layout = LAYOUT.matcher(statement);
 		while (layout.find()) {
 			for (String part : layout.group(1).split(",")) {

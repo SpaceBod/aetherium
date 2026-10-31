@@ -322,7 +322,7 @@ public final class ShadowPass implements AutoCloseable, TargetLayout {
 				for (int side = 0; side < (pingPong[i] ? 2 : 1); side++) {
 					int index = i;
 					String suffix = side == 0 ? "" : " alt";
-					colors[i][side] = TargetStorage.create(() -> device.createTexture(() -> "Aetherium Shaders shadowcolor" + index + suffix,
+					colors[i][side] = TargetStorage.create(true, index, () -> device.createTexture(() -> "Aetherium Shaders shadowcolor" + index + suffix,
 							GpuTexture.USAGE_RENDER_ATTACHMENT | GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC,
 							formats[index], resolution, resolution, 1, levels));
 					colorViews[i][side] = device.createTextureView(colors[i][side], 0, 1);

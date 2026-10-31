@@ -192,7 +192,7 @@ final class PackLoad {
 			// and where the pack's custom images, storage buffers and raw textures vanilla cannot hold are bound (set 1).
 			raws = storageFeatures ? RawTextures.collect(pack) : List.of();
 			// Targets bound as images (colorimgN, shadowcolorimgN) need storage usage; set before any target is created.
-			TargetStorage.configure(storageFeatures && TargetStorage.usedBy(programs));
+			TargetStorage.configure(storageFeatures && TargetStorage.usedBy(programs), programs);
 			storageNeeded = storageFeatures
 					&& (!pack.getCustomImages().isEmpty() || !pack.getBufferObjects().isEmpty() || !raws.isEmpty() || TargetStorage.active());
 			if (storageNeeded) {

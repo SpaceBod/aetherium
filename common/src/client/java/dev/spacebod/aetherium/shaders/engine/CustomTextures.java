@@ -219,7 +219,7 @@ final class CustomTextures implements AutoCloseable {
 
 	/** Whether vanilla's texture API holds this raw data (else it goes to the storage set, {@link RawTextures}). */
 	static boolean vanillaCanHold(CustomTextureData.RawData raw) {
-		return vanillaFormat(raw) != null;
+		return raw instanceof CustomTextureData.RawData2D && vanillaFormat(raw) != null;
 	}
 
 	/** 8-bit unsigned raw data in R, RG or RGBA layout ({@link #vanillaCanHold}). */

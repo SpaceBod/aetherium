@@ -1,5 +1,6 @@
 package dev.spacebod.aetherium.shaders.engine;
 
+import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuSampler;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuTextureView;
@@ -19,6 +20,7 @@ import dev.spacebod.aetherium.shaders.uniforms.custom.CustomUniforms;
 import java.nio.ByteBuffer;
 import java.nio.LongBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -79,10 +81,12 @@ public final class ComputePass implements AutoCloseable {
 	private final ByteBuffer uniformMemory;
 	private final TextureStage stage;
 	private int slot;
+	private final Map<String, GpuFormat> imageFormats;
+	private final TargetImageViews targetViews;
 
 	private ComputePass(String name, TextureStage stage, VulkanDevice vulkan, BlockProgramUniforms uniforms, List<String> samplers, int[] localSize,
 			@Nullable Vector3i workGroups, Vector2f workGroupRelative, @Nullable IndirectPointer indirect, long setLayout, long layout, long pipeline,
-			int blockSize) {
+			int blockSize, String glsl) {
 		this.name = name;
 		this.stage = stage;
 		this.vulkan = vulkan;
@@ -96,6 +100,8 @@ public final class ComputePass implements AutoCloseable {
 		this.setLayout = setLayout;
 		this.layout = layout;
 		this.pipeline = pipeline;
+		this.targetViews = new TargetImageViews(vulkan);
+		this.imageFormats = TargetImageViews.formats(glsl);
 		this.blockSize = blockSize;
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			long images = samplers.stream().filter(s -> targetImage(s) != null).count();
@@ -223,7 +229,7 @@ public final class ComputePass implements AutoCloseable {
 			customUniforms.assignTo(uniforms);
 			Vector2f relative = source.getWorkGroupRelative() != null ? source.getWorkGroupRelative() : new Vector2f(1, 1);
 			ComputePass pass = new ComputePass(name, stage, vulkan, uniforms, samplers, localSize, source.getWorkGroups(), relative,
-					source.getIndirectPointer(), prepared.setLayout(), prepared.layout(), prepared.pipeline(), blockLayout.size());
+					source.getIndirectPointer(), prepared.setLayout(), prepared.layout(), prepared.pipeline(), blockLayout.size(), lowered.glsl());
 			customUniforms.mapholderToPass(uniforms, pass);
 			List<String> missing = uniforms.unprovided();
 			if (!missing.isEmpty()) {
@@ -313,7 +319,7 @@ public final class ComputePass implements AutoCloseable {
 					if (t == null || !(t.view() instanceof VulkanGpuTextureView v)) {
 						continue;
 					}
-					view = v.vkImageView();
+					view = targetViews.view(v, imageFormats.get(samplers.get(i)));
 					sampler = 0;
 				} else {
 					SamplerTable.Bound t = textures.apply(samplers.get(i));
@@ -377,6 +383,7 @@ public final class ComputePass implements AutoCloseable {
 
 	@Override
 	public void close() {
+		targetViews.close();
 		VK10.vkDestroyPipeline(device, pipeline, null);
 		VK10.vkDestroyPipelineLayout(device, layout, null);
 		VK10.vkDestroyDescriptorSetLayout(device, setLayout, null);

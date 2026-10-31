@@ -51,6 +51,7 @@
 		"shaders.PipelineBuilderMixin",
 		"shaders.VulkanFeatureSetsMixin",
 		"shaders.VulkanConstMixin",
+		"shaders.VulkanGpuTextureMixin",
 		"shaders.VulkanRenderPassMixin",
 		"shaders.VulkanRenderPipelineMixin",
 		"shaders.ClientLevelWeatherMixin",
