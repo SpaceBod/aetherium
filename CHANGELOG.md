@@ -9,6 +9,47 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 - Alternating anisotropic terrain and ordinary entity draws reuse their albedo samplers instead of accumulating
   retired Vulkan samplers until a pack unloads, preventing sampler exhaustion with anisotropic texture filtering.
+- Copies of vanilla render pipelines made by cosmetic mods retain their shader-pack entity and shadow programs,
+  preventing Essential's translucent cosmetics from falling back to unencoded vanilla output. Unmatched pipeline
+  lookups are cached instead of scanning the registered pipelines on every draw.
+- Polytone uses vanilla leads while a shader pack is active, matching its Iris fallback and preventing rainbow leads
+  with packs that encode their material buffers. Its textured leads still work without a shader pack.
+- Shader interface blocks are split into individual varyings before Minecraft builds Vulkan pipelines, preventing
+  compositing and world programs in packs such as Emanrux and Eclipse from failing with a struct interface error.
+- Unsupported optional shader-pack features no longer activate shader stages, including tessellation.
+- Custom uniform expressions accept the GLSL `fract()` function.
+- Different blend functions per colour attachment are preserved on Vulkan devices with independent blending,
+  allowing Iteration's water program to build.
+- Texture samplers are renamed according to local scope, including reads in a local variable's initializer;
+  Iteration's water, shadow and weather shaders no longer fail when their sampled colour is also named `tex`.
+- Geometry stage inputs and outputs use separate location ranges, avoiding excessive geometry output locations
+  and device loss with SEUS PTGI HRR 3. Integer varyings carry matching flat interpolation in every stage.
+- Empty world fragment placeholders no longer reserve a colour target, preserving all eight real world targets in
+  Alpha Piscium and Bliss. Full-screen placeholders keep their primary target for safe render-pass sizing.
+  Inactive Distant Horizons programs do not reserve world targets.
+- Custom image declarations accept repeated whitespace and up to 32 images; Derivative's original release now
+  retains all of its image bindings. Mixed-case block IDs and non-English property comments no longer abort or
+  truncate pack material maps.
+- Compute uniform copies respect the device's offset alignment; pack buffers support indirect dispatch and
+  1D lookup textures keep their Vulkan dimension. Supported NVIDIA subgroup partition operations are enabled.
+- Compatible target image formats use views of the same storage, including Alpha Piscium's RGBA8 clears of
+  R32UI targets. Mutable formats are enabled only for targets a compute program accesses through a different
+  compatible format. Invalid vector constants emitted by the shader optimizer trigger an unoptimized recompile.
+- Full-screen shaders accept explicit position and UV inputs alongside legacy built-ins, restoring IterationRP's
+  post-processing instead of leaving those inputs unbound.
+- Store-only compute programs with compatible normalized image declarations use the floating-point target's
+  format, preserving numeric values and preventing IterationRP's white screen.
+- Integer and boolean uniform providers convert to float when a pack declares a floating-point flag.
+- Custom uniform expressions support vector/scalar multiplication in either order, restoring MakeUp's TAA correction.
+- Iteration's End shaders accept matrix transpose and inverse expressions in their global initializers.
+- Compute shaders are included when checking which depth textures a pack reads. Opaque shadow and no-hand depth
+  copies are no longer skipped for compute-only readers, restoring sunlight and light shafts in Alpha Piscium.
+- Vulkan pass barriers include geometry, tessellation and early depth-test accesses, keeping shader storage and
+  depth writes visible to later passes.
+- Default shadow draw buffers include shadowcolor1 only when the fragment shader exposes a second output,
+  retaining SEUS's voxel lighting without reserving an unused target.
+- Shadow colour textures used only as compute images are allocated even without render attachments, restoring
+  Rethinking Voxels' water waves.
 
 ## [0.1.1] - 2026-10-18
 
