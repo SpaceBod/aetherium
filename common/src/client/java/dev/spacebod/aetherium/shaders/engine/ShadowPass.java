@@ -170,7 +170,7 @@ public final class ShadowPass implements AutoCloseable, TargetLayout {
 			}
 		}
 		int highest = Math.max(buffers.isEmpty() ? 1 : buffers.last(), composited.isEmpty() ? 1 : composited.last());
-		int colorCount = Math.max(2, highest + 1);
+		int colorCount = ShadowImageTargets.requiredCount(Math.max(2, highest + 1), TargetStorage.sourceTexts(programs));
 		boolean[] pingPong = new boolean[colorCount];
 		composited.forEach(b -> pingPong[b] = true);
 		boolean[] compositeMipmapped = new boolean[colorCount];

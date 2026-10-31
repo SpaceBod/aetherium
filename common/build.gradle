@@ -27,6 +27,7 @@ def microbenchTask = { String name, String mainClassName, String text ->
 	}
 }
 microbenchTask('microbench', 'dev.spacebod.aetherium.microbench.Microbench', 'Times vanilla vs candidate algorithms on synthetic data')
+microbenchTask('shadowImageTargetChecks', 'dev.spacebod.aetherium.shaders.engine.ShadowImageTargetFixtures', 'Checks allocation requirements for compute-only shadow textures')
 microbenchTask('parity', 'dev.spacebod.aetherium.microbench.Parity', 'Randomized differential tests of the candidates against vanilla behaviour')
 
 // Shader-pack stack libraries (spacebod.base), bundled into the loader jars by fabric/ and neoforge/.
