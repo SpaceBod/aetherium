@@ -45,6 +45,7 @@ public final class Diagnostics {
 	private static final double LEAD_SECONDS = 3.0;
 
 	private static volatile boolean waitIdle;
+	private static volatile boolean waitAfterShadowComposite;
 	private static volatile boolean readback = true;
 	/** {@link #readback} as the pack's images were created with it (a pack reload applies a change). */
 	private static volatile boolean readbackActive;
@@ -77,6 +78,18 @@ public final class Diagnostics {
 
 	public static void setWaitIdle(boolean on) {
 		waitIdle = on;
+	}
+
+	/**
+	 * Submit the frame so far and wait for the GPU right after the shadowcomp stage (where coloured-lighting packs spread
+	 * their light), so nothing after it overlaps it.
+	 */
+	public static boolean waitAfterShadowComposite() {
+		return waitAfterShadowComposite;
+	}
+
+	public static void setWaitAfterShadowComposite(boolean on) {
+		waitAfterShadowComposite = on;
 	}
 
 	/**
@@ -303,7 +316,7 @@ public final class Diagnostics {
 			opts.append(' ').append(o.id()).append('=').append(Optimisations.isEnabled(o.id()) ? "on" : "off");
 		}
 		out.add(opts.toString());
-		out.add("diagnostics waitIdle=" + waitIdle + " readback=" + readbackActive + " validationRequested=" + validationThisRun
+		out.add("diagnostics waitIdle=" + waitIdle + " waitAfterShadowComposite=" + waitAfterShadowComposite + " readback=" + readbackActive + " validationRequested=" + validationThisRun
 				+ " | frame limit " + mc.options.framerateLimit().get() + " vsync " + mc.options.enableVsync().get());
 		String pack = ShaderPackSettings.activePack().orElse("none");
 		out.add("pack " + pack + " | render scale " + ShaderPackSettings.renderScale() + "%");
@@ -317,7 +330,7 @@ public final class Diagnostics {
 		out.addAll(ShaderPackEngine.get().diagnosticsHeader());
 		out.add("# frame lines: values at the start of the frame, then counts of what the frame did (passes, clears, copies, submits");
 		out.add("# and dispatched computes appear on the next frame's line as prev*). readback lines describe the pack images as");
-		out.add("# the given frame left them.");
+		out.add("# the given frame left them; readback-mid lines the same images right after that frame's shadowcomp stage.");
 		return out;
 	}
 }

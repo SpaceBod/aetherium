@@ -385,6 +385,11 @@ public final class BenchDriver {
 					// AETHERIUM_PLAY_DIAG=1: a diagnostics recording, requested 10 s in (it starts 3 s later, with no menu open).
 					if (PLAY_DIAG && !diagRequested && seconds(now - playStart) >= 10) {
 						diagRequested = true;
+						if ("waits".equals(System.getenv("AETHERIUM_PLAY_DIAG"))) {
+							// Both GPU waits on, to check they run.
+							dev.spacebod.aetherium.client.diag.Diagnostics.setWaitIdle(true);
+							dev.spacebod.aetherium.client.diag.Diagnostics.setWaitAfterShadowComposite(true);
+						}
 						dev.spacebod.aetherium.client.diag.Diagnostics.requestRecording();
 					}
 					// AETHERIUM_PLAY_WALK=<blocks per second>: from 15 s in, the player walks the way it faces until the burst is

@@ -366,6 +366,10 @@ final class SettingsCatalog {
 						"Each frame starts only once the GPU has finished everything before it, so no work of two frames overlaps. Much slower. If a problem goes away with this on, it comes from work overlapping on the GPU. Off again after a restart.",
 						Diagnostics::waitIdle, Diagnostics::setWaitIdle)
 				.defaults(() -> false).immediate().tags(Tag.INSTANT);
+		Setting<Boolean> waitAfterLight = Setting.toggle("aetherium.diag.wait_after_shadowcomp", "Wait for the GPU after the light step",
+						"Right after the pack's shadowcomp programs (where coloured lighting spreads its light), the frame so far is sent to the GPU and the game waits for it, so nothing that reads the light overlaps the step that writes it. Slower. Off again after a restart.",
+						Diagnostics::waitAfterShadowComposite, Diagnostics::setWaitAfterShadowComposite)
+				.defaults(() -> false).immediate().tags(Tag.INSTANT);
 		Setting<Boolean> readback = Setting.toggle("aetherium.diag.readback", "Read back pack images",
 						"Recordings include a summary of the texels at the centre of every pack image (coloured-lighting volumes are centred on you). Off: the images are made exactly as in normal play. Reloads the pack.",
 						Diagnostics::readback, Diagnostics::setReadback)
@@ -406,7 +410,7 @@ final class SettingsCatalog {
 		}
 		return new Setting.Sections()
 				.add("Recording", List.of(record, status, folder))
-				.addColumns("Tests", List.of(waitIdle, readback, validation, vsync, frameLimit))
+				.addColumns("Tests", List.of(waitIdle, waitAfterLight, readback, validation, vsync, frameLimit))
 				.add("Shader pack", pack)
 				.addColumns("Optimisations", suspects)
 				.build();

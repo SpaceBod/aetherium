@@ -90,6 +90,8 @@ public final class PackStorage implements AutoCloseable {
 	private boolean needsInit = true;
 	/** {@link Diagnostics#readback()}: boxes of the images copied back while a recording runs (made with the images). */
 	private @Nullable PackImageReadback readback;
+	/** The same boxes copied again right after the shadowcomp stage ({@link #readbackAfterLight}). */
+	private @Nullable PackImageReadback readbackMid;
 	/** Raw custom textures ({@link RawTextures}): created once, never resized, uploaded by the first frame. */
 	private final List<RawTextures.Texture> raws;
 	private final long[] rawImages;
@@ -236,6 +238,13 @@ public final class PackStorage implements AutoCloseable {
 
 	public long setLayout() {
 		return setLayout;
+	}
+
+	/** Diagnostics recordings: the images as the shadowcomp stage left them this frame, before anything reads them. */
+	public void readbackAfterLight(VkCommandBuffer cb) {
+		if (readbackMid != null && !needsInit) {
+			readbackMid.record(cb, frame);
+		}
 	}
 
 	/** The images (name, format, size, cleared each frame) and buffers, for diagnostics recordings. */
@@ -387,7 +396,8 @@ public final class PackStorage implements AutoCloseable {
 				readbackTargets.add(new PackImageReadback.Target(info.name(), image.binding().format(), image.integer(), vkImages[i], new int[]{w, h, d}));
 			}
 			if (copyBack) {
-				readback = new PackImageReadback(vulkan, readbackTargets, texelBytes);
+				readback = new PackImageReadback(vulkan, "readback", -1, readbackTargets, texelBytes);
+				readbackMid = new PackImageReadback(vulkan, "readback-mid", 0, readbackTargets, texelBytes);
 			}
 			viewHandles = new long[views.size()];
 			for (int v = 0; v < views.size(); v++) {
@@ -470,8 +480,9 @@ public final class PackStorage implements AutoCloseable {
 		frame++;
 		VulkanCompute.barrier(cb, VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT,
 				VK10.VK_PIPELINE_STAGE_TRANSFER_BIT, VK10.VK_ACCESS_TRANSFER_WRITE_BIT);
-		if (readback != null && !needsInit) {
+		if (readback != null && readbackMid != null && !needsInit) {
 			readback.harvest(frame);
+			readbackMid.harvest(frame);
 			readback.record(cb, frame);
 		}
 		boolean init = needsInit;
@@ -702,6 +713,10 @@ public final class PackStorage implements AutoCloseable {
 		if (readback != null) {
 			readback.close();
 			readback = null;
+		}
+		if (readbackMid != null) {
+			readbackMid.close();
+			readbackMid = null;
 		}
 		for (long view : viewHandles) {
 			VK10.vkDestroyImageView(device, view, null);

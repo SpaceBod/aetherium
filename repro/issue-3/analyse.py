@@ -25,9 +25,11 @@ for line in open(path, encoding="utf-8"):
                 k, v = p.split("=", 1)
                 fields[k].append(v)
         frames[n] = fields
-    elif line.startswith("readback frame "):
-        m = re.match(r"readback frame (-?\d+) img=(\S+) (.*)", line)
-        readback[m.group(2)][int(m.group(1))] = dict(kv.split("=", 1) for kv in m.group(3).split(" ") if "=" in kv)
+    elif line.startswith("readback"):
+        # readback: the image at the start of the next frame; readback-mid: right after that frame's shadowcomp.
+        m = re.match(r"(readback(?:-mid)?) frame (-?\d+) img=(\S+) (.*)", line)
+        name = m.group(3) + (" after shadowcomp" if m.group(1) == "readback-mid" else "")
+        readback[name][int(m.group(2))] = dict(kv.split("=", 1) for kv in m.group(4).split(" ") if "=" in kv)
     else:
         header.append(line)
 
@@ -97,7 +99,7 @@ if vox:
     gt = [int(vox[n]["gt1"]) for n in sorted(vox)]
     drops = sum(1 for i in range(1, len(gt)) if gt[i] < gt[i - 1] * 0.8)
     print(f"\nvoxel_img light sources (gt1): min {min(gt)} max {max(gt)}, sudden drops >20%: {drops}")
-for img in ("floodfill_img", "floodfill_img_copy"):
+for img in ("floodfill_img", "floodfill_img_copy", "floodfill_img after shadowcomp", "floodfill_img_copy after shadowcomp"):
     ff = readback.get(img)
     if ff:
         s = [sum(float(x) for x in ff[n]["sum"].split(",")[:3]) for n in sorted(ff)]

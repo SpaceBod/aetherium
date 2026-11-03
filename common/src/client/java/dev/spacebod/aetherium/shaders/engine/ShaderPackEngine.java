@@ -565,6 +565,7 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 			// shadowcomp stage: its computes and full-screen passes after the shadow map, on the shadowcolor targets.
 			if (shadow != null) {
 				runStage(ProgramArrayId.ShadowComposite);
+				afterShadowComposite();
 			}
 			runStage(ProgramArrayId.Prepare);
 		} catch (RuntimeException e) {
@@ -1623,13 +1624,35 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 		});
 	}
 
+	/** Diagnostics: the pack images as shadowcomp left them, and the wait for the GPU between it and its readers. */
+	private void afterShadowComposite() {
+		if (storage != null && Diagnostics.recording()) {
+			PackStorage s = storage;
+			recordAndExecute(s::readbackAfterLight);
+		}
+		if (Diagnostics.waitAfterShadowComposite()) {
+			var encoder = VulkanAccess.encoder();
+			var device = VulkanAccess.device();
+			if (encoder != null && device != null) {
+				encoder.submit();
+				VK10.vkDeviceWaitIdle(device.vkDevice());
+			}
+		}
+	}
+
+	/** {@link FrameCensus#totals} at the start of the last recorded frame. */
+	private long @Nullable [] censusAtFrameStart;
+
 	/** Diagnostics recordings: what this frame starts from (see {@link Diagnostics}). */
 	private void recordFrameStart(CameraRenderState camera, float partialTick) {
-		int[] last = FrameCensus.lastFrame();
-		Diagnostics.put("prevPasses", last[0]);
-		Diagnostics.put("prevClears", last[1]);
-		Diagnostics.put("prevCopies", last[2]);
-		Diagnostics.put("prevSubmits", last[3]);
+		long[] totals = FrameCensus.totals();
+		if (censusAtFrameStart != null && Diagnostics.frameNumber() > 1) {
+			Diagnostics.put("prevPasses", totals[0] - censusAtFrameStart[0]);
+			Diagnostics.put("prevClears", totals[1] - censusAtFrameStart[1]);
+			Diagnostics.put("prevCopies", totals[2] - censusAtFrameStart[2]);
+			Diagnostics.put("prevSubmits", totals[3] - censusAtFrameStart[3]);
+		}
+		censusAtFrameStart = totals;
 		Diagnostics.put("frameCounter", SystemTimeUniforms.COUNTER.getAsInt());
 		Diagnostics.put("partialTick", String.format(Locale.ROOT, "%.3f", partialTick));
 		Diagnostics.put("camera", vector(camera.pos.x, camera.pos.y, camera.pos.z));

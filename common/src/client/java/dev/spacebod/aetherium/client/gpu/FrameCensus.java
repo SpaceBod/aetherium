@@ -18,9 +18,9 @@ public final class FrameCensus {
 	private static long windowStart;
 	/** The last closed window, per frame; null until one closed. */
 	private static volatile @Nullable String line;
-	/** The counters at the end of the last frame, and what that frame alone did (passes, clears, copies, submits). */
+	/** The counters at the last submit, and everything counted before it (passes, clears, copies, submits). */
 	private static int[] mark = new int[4];
-	private static int[] lastFrame = new int[4];
+	private static final long[] total = new long[4];
 
 	private FrameCensus() {
 	}
@@ -28,8 +28,11 @@ public final class FrameCensus {
 	/** The end of a frame (its submit): counts it, and closes the window after a second. */
 	public static void endFrame() {
 		frames++;
-		lastFrame = new int[]{passes - mark[0], clears - mark[1], copies - mark[2], submits - mark[3]};
-		mark = new int[]{passes, clears, copies, submits};
+		int[] now0 = {passes, clears, copies, submits};
+		for (int i = 0; i < 4; i++) {
+			total[i] += now0[i] - mark[i];
+		}
+		mark = now0;
 		long now = System.nanoTime();
 		if (now - windowStart < 1_000_000_000L) {
 			return;
@@ -48,9 +51,17 @@ public final class FrameCensus {
 		submits = 0;
 	}
 
-	/** Render passes, clears, texture copies and submits of the last finished frame (diagnostics recordings). */
-	public static int[] lastFrame() {
-		return lastFrame;
+	/**
+	 * Render passes, clears, texture copies and submits counted since the game started (diagnostics recordings take the
+	 * difference between two frame starts, so a frame submitted in parts still counts as one).
+	 */
+	public static long[] totals() {
+		int[] now0 = {passes, clears, copies, submits};
+		long[] out = new long[4];
+		for (int i = 0; i < 4; i++) {
+			out[i] = total[i] + now0[i] - mark[i];
+		}
+		return out;
 	}
 
 	/** The F3 line for the last second, or null before the first second passed (or on a backend that is not Vulkan). */

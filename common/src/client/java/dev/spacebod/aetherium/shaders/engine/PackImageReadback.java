@@ -42,6 +42,10 @@ final class PackImageReadback implements AutoCloseable {
 	}
 
 	private final VulkanDevice vulkan;
+	/** Line prefix: {@code readback} at the start of a frame, {@code readback-mid} after the shadowcomp stage. */
+	private final String label;
+	/** The frame a copy describes, relative to the frame recording it (-1: the start of a frame shows the one before). */
+	private final int frameOffset;
 	private final List<Target> targets;
 	private final Box[] boxes;
 	private final long[][] buffers;
@@ -51,8 +55,10 @@ final class PackImageReadback implements AutoCloseable {
 	private final int[] slotStorageFrame = new int[SLOTS];
 	private final int[] slotDiagFrame = new int[SLOTS];
 
-	PackImageReadback(VulkanDevice vulkan, List<Target> targets, int[] bytesPerTexel) {
+	PackImageReadback(VulkanDevice vulkan, String label, int frameOffset, List<Target> targets, int[] bytesPerTexel) {
 		this.vulkan = vulkan;
+		this.label = label;
+		this.frameOffset = frameOffset;
 		this.targets = targets;
 		int n = targets.size();
 		boxes = new Box[n];
@@ -85,8 +91,8 @@ final class PackImageReadback implements AutoCloseable {
 	}
 
 	/**
-	 * Copies every box into this frame's slot. Recorded at the start of the storage's frame, before its clears: everything
-	 * earlier is ordered before the copies by the caller's barrier, and the clears after them by the barrier here.
+	 * Copies every box into this frame's slot: everything recorded earlier is ordered before the copies, and everything
+	 * after them (the frame's clears, later writes) after.
 	 */
 	void record(VkCommandBuffer cb, int storageFrame) {
 		int diagFrame = Diagnostics.frameNumber();
@@ -108,10 +114,10 @@ final class PackImageReadback implements AutoCloseable {
 			}
 		}
 		VulkanCompute.barrier(cb, VK10.VK_PIPELINE_STAGE_TRANSFER_BIT, VK10.VK_ACCESS_TRANSFER_WRITE_BIT,
-				VK10.VK_PIPELINE_STAGE_TRANSFER_BIT | VK10.VK_PIPELINE_STAGE_HOST_BIT, VK10.VK_ACCESS_TRANSFER_WRITE_BIT | VK10.VK_ACCESS_HOST_READ_BIT);
+				VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK10.VK_PIPELINE_STAGE_HOST_BIT,
+				VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT | VK10.VK_ACCESS_HOST_READ_BIT);
 		slotStorageFrame[slot] = storageFrame;
-		// The copy shows what the previous frame left behind.
-		slotDiagFrame[slot] = diagFrame - 1;
+		slotDiagFrame[slot] = diagFrame + frameOffset;
 	}
 
 	/** Summarises every slot whose copy has finished (see {@link #LATENCY}) into recording lines. */
@@ -122,7 +128,7 @@ final class PackImageReadback implements AutoCloseable {
 			}
 			for (int i = 0; i < targets.size(); i++) {
 				Vma.vmaInvalidateAllocation(vulkan.vma(), allocations[slot][i], 0, VK10.VK_WHOLE_SIZE);
-				Diagnostics.line("readback frame " + slotDiagFrame[slot] + " " + summary(targets.get(i), boxes[i], mapped[slot][i]));
+				Diagnostics.line(label + " frame " + slotDiagFrame[slot] + " " + summary(targets.get(i), boxes[i], mapped[slot][i]));
 			}
 			slotDiagFrame[slot] = -1;
 		}

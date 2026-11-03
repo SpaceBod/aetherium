@@ -60,13 +60,14 @@ exactly as when you see the flicker.
 | # | Switch (on the Diagnostics page) | Set it to | Flicker stopped / better / same? |
 |---|-----------------------------------|-----------|----------------------------------|
 | 1 | Tests › **Wait for the GPU every frame** | On | |
+| 1b | Tests › **Wait for the GPU after the light step** | On | |
 | 2 | Shader pack › **Pack: anti-aliasing (TAA_DEFINE)** | -1 | |
 | 3 | Shader pack › **Render scale** | Off (all the way right) | |
 | 4 | Tests › **VSync** | the opposite of what it is now | |
 | 5 | Tests › **Frame rate limit** | 60 fps | |
 | 6 | Optimisations › **All optimisations off** → press **Stage**, then **Apply** | (restart the game if it asks) | |
 
-Switch 1 makes the game much slower. That's expected.
+Switches 1 and 1b make the game slower. That's expected.
 
 To undo switch 6: on the **Performance** page, press **Use** next to **Recommended**, then **Apply**. When you've finished
 testing, you can also just put your old Aetherium jar back.
