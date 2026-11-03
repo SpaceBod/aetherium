@@ -451,7 +451,17 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 				// setup.csh and setup_a..z run again after a resize (packs size their images from the screen).
 				setupRan = false;
 			}
+			depth.resize(mainTarget.width, mainTarget.height);
+			arena.beginFrame();
+			if (shadowFrame != null) {
+				// Pins the shadow light angle the shadow matrices below are computed from.
+				shadowFrame.beginFrame(camera, EngineSwitches.enabled(EngineSwitches.SHADOW_CACHE));
+			}
+			updateNotifier.onNewFrame();
+			customUniforms.update();
 			if (storage != null) {
+				// After the frame's uniforms: each dispatch uploads the camera, shadow matrices and custom uniforms as they
+				// are now, and every later pass of the frame sees this frame's values too.
 				storage.resize(mainTarget.width, mainTarget.height);
 				PackStorage s = storage;
 				recordAndExecute(s::beginFrame);
@@ -463,13 +473,6 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 				int shadowSize = shadow != null ? shadow.resolution() : 0;
 				runComputes(plan.shadow, shadowSize, shadowSize, null);
 			}
-			depth.resize(mainTarget.width, mainTarget.height);
-			arena.beginFrame();
-			if (shadowFrame != null) {
-				shadowFrame.beginFrame(camera, EngineSwitches.enabled(EngineSwitches.SHADOW_CACHE));
-			}
-			updateNotifier.onNewFrame();
-			customUniforms.update();
 			lean = EngineSwitches.enabled(EngineSwitches.LEAN_FRAME);
 			settledBindings = EngineSwitches.enabled(EngineSwitches.SETTLED_BINDINGS);
 			reachSnapshots = EngineSwitches.enabled(EngineSwitches.REACH_SNAPSHOTS);

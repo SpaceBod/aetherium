@@ -7,6 +7,9 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- Compute programs that run at the start of a frame or of the shadow pass (`setup` and `shadow`) see that frame's
+  camera and shadow matrices and custom uniforms instead of the previous frame's. With the shadow cache on, a frame
+  whose shadow compute reads the shadow matrices no longer keeps the previous light angle in them for the whole frame.
 - Alternating anisotropic terrain and ordinary entity draws reuse their albedo samplers instead of accumulating
   retired Vulkan samplers until a pack unloads, preventing sampler exhaustion with anisotropic texture filtering.
 - Copies of vanilla render pipelines made by cosmetic mods retain their shader-pack entity and shadow programs,
