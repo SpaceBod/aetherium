@@ -18,6 +18,9 @@ public final class FrameCensus {
 	private static long windowStart;
 	/** The last closed window, per frame; null until one closed. */
 	private static volatile @Nullable String line;
+	/** The counters at the end of the last frame, and what that frame alone did (passes, clears, copies, submits). */
+	private static int[] mark = new int[4];
+	private static int[] lastFrame = new int[4];
 
 	private FrameCensus() {
 	}
@@ -25,6 +28,8 @@ public final class FrameCensus {
 	/** The end of a frame (its submit): counts it, and closes the window after a second. */
 	public static void endFrame() {
 		frames++;
+		lastFrame = new int[]{passes - mark[0], clears - mark[1], copies - mark[2], submits - mark[3]};
+		mark = new int[]{passes, clears, copies, submits};
 		long now = System.nanoTime();
 		if (now - windowStart < 1_000_000_000L) {
 			return;
@@ -36,10 +41,16 @@ public final class FrameCensus {
 		}
 		windowStart = now;
 		frames = 0;
+		mark = new int[4];
 		passes = 0;
 		clears = 0;
 		copies = 0;
 		submits = 0;
+	}
+
+	/** Render passes, clears, texture copies and submits of the last finished frame (diagnostics recordings). */
+	public static int[] lastFrame() {
+		return lastFrame;
 	}
 
 	/** The F3 line for the last second, or null before the first second passed (or on a backend that is not Vulkan). */

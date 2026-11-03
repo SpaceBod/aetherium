@@ -16,6 +16,7 @@ import com.mojang.renderpearl.api.textures.GpuTexture;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import com.mojang.renderpearl.backend.vulkan.VulkanGpuTextureView;
 import dev.spacebod.aetherium.client.DevHooks;
+import dev.spacebod.aetherium.client.diag.Diagnostics;
 import dev.spacebod.aetherium.client.gpu.FrameCensus;
 import dev.spacebod.aetherium.client.gpu.PassViewport;
 import dev.spacebod.aetherium.client.gpu.PipelineCacheStore;
@@ -61,6 +62,7 @@ import dev.spacebod.aetherium.shaders.uniforms.DateTimeUniforms;
 import dev.spacebod.aetherium.shaders.uniforms.DrawState;
 import dev.spacebod.aetherium.shaders.uniforms.FrameUpdateNotifier;
 import dev.spacebod.aetherium.shaders.parsing.SmoothFloat;
+import dev.spacebod.aetherium.shaders.uniforms.CameraUniforms;
 import dev.spacebod.aetherium.shaders.uniforms.SystemTimeUniforms;
 import dev.spacebod.aetherium.shaders.uniforms.custom.CustomUniforms;
 import java.io.IOException;
@@ -422,6 +424,7 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 		}
 		try {
 			main = mainTarget;
+			Diagnostics.beginFrame();
 			// Advanced once per frame; frameTime, frameCounter and every per-frame uniform depend on them.
 			SystemTimeUniforms.COUNTER.beginFrame();
 			SystemTimeUniforms.TIMER.beginFrame(Util.getNanos());
@@ -459,6 +462,9 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 			}
 			updateNotifier.onNewFrame();
 			customUniforms.update();
+			if (Diagnostics.recording()) {
+				recordFrameStart(camera, partialTick);
+			}
 			if (storage != null) {
 				// After the frame's uniforms: each dispatch uploads the camera, shadow matrices and custom uniforms as they
 				// are now, and every later pass of the frame sees this frame's values too.
@@ -542,6 +548,10 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 				DevHooks.stageBegin("shaders:shadow");
 				try {
 					shadowFrame.draw(features, lean, quad, this);
+					if (Diagnostics.recording()) {
+						Diagnostics.put("shadowDrawn", matrix(shadow.modelView()));
+						Diagnostics.put("casters", shadowFrame.casterSections());
+					}
 					if (lodsThisFrame && packHasLodShadow) {
 						drawLodShadows();
 					}
@@ -1606,10 +1616,56 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 					VulkanCompute.barrier(cb, VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK10.VK_ACCESS_SHADER_WRITE_BIT, computeStages, computeAccess);
 				}
 				pass.dispatch(cb, customUniforms, name -> computeTexture(name, pass.stage(), written), set, storage, width, height);
+				Diagnostics.put("cs", pass.name());
 			}
 			VulkanCompute.barrier(cb, VK10.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK10.VK_ACCESS_SHADER_WRITE_BIT,
 					VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT);
 		});
+	}
+
+	/** Diagnostics recordings: what this frame starts from (see {@link Diagnostics}). */
+	private void recordFrameStart(CameraRenderState camera, float partialTick) {
+		int[] last = FrameCensus.lastFrame();
+		Diagnostics.put("prevPasses", last[0]);
+		Diagnostics.put("prevClears", last[1]);
+		Diagnostics.put("prevCopies", last[2]);
+		Diagnostics.put("prevSubmits", last[3]);
+		Diagnostics.put("frameCounter", SystemTimeUniforms.COUNTER.getAsInt());
+		Diagnostics.put("partialTick", String.format(Locale.ROOT, "%.3f", partialTick));
+		Diagnostics.put("camera", vector(camera.pos.x, camera.pos.y, camera.pos.z));
+		var u = CameraUniforms.diagnosticsSnapshot();
+		Diagnostics.put("cameraPosition", vector(u[0], u[1], u[2]));
+		Diagnostics.put("previousCameraPosition", vector(u[3], u[4], u[5]));
+		Diagnostics.put("shadowModelView", matrix(dev.spacebod.aetherium.shaders.shadows.ShadowView.modelView(programs.getPackDirectives())));
+		Diagnostics.put("uniforms", customUniforms.describeScalars());
+	}
+
+	/** Diagnostics recordings: the pack's resources and choices, for the header. */
+	public List<String> diagnosticsHeader() {
+		List<String> out = new ArrayList<>();
+		if (state != State.ACTIVE) {
+			out.add("engine state " + state);
+			return out;
+		}
+		out.add("shadow " + (shadow == null ? "none" : shadow.resolution() + " px, reach " + Math.round(shadow.mapReach()) + ", culling "
+				+ (shadowFrame == null ? "-" : shadowFrame.cacheAvailable() ? "cache available" : "cache not available")));
+		out.add("storage " + (storage == null ? "none" : storage.describe()));
+		out.add("computes setup=" + names(plan.setup) + " shadow=" + names(plan.shadow) + " final=" + names(plan.finalComputes));
+		return out;
+	}
+
+	private static String names(ComputePass @Nullable [] list) {
+		return list == null ? "[]" : Arrays.stream(list).map(ComputePass::name).toList().toString();
+	}
+
+	private static String vector(double x, double y, double z) {
+		return String.format(Locale.ROOT, "%.4f,%.4f,%.4f", x, y, z);
+	}
+
+	private static String matrix(org.joml.Matrix4fc m) {
+		return String.format(Locale.ROOT, "[%.5f,%.5f,%.5f,%.5f|%.5f,%.5f,%.5f,%.5f|%.5f,%.5f,%.5f,%.5f|%.4f,%.4f,%.4f,%.4f]",
+				m.m00(), m.m01(), m.m02(), m.m03(), m.m10(), m.m11(), m.m12(), m.m13(),
+				m.m20(), m.m21(), m.m22(), m.m23(), m.m30(), m.m31(), m.m32(), m.m33());
 	}
 
 	/** What a compute program's sampler reads: the same textures full-screen passes get, custom textures included. */

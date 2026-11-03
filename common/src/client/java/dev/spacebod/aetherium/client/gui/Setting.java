@@ -272,10 +272,14 @@ public final class Setting<T> {
 				|| keywords.toLowerCase(Locale.ROOT).contains(q) || id.toLowerCase(Locale.ROOT).contains(q);
 	}
 
-	/** A titled group of rows. */
-	public record Section(String title, List<Setting<?>> settings) {
+	/** A titled group of rows. {@code columns}: neighbouring toggles share a row, two to a row. */
+	public record Section(String title, List<Setting<?>> settings, boolean columns) {
 		public Section {
 			settings = List.copyOf(settings);
+		}
+
+		public Section(String title, List<Setting<?>> settings) {
+			this(title, settings, false);
 		}
 	}
 
@@ -290,6 +294,14 @@ public final class Setting<T> {
 		public Sections add(String title, List<? extends Setting<?>> settings) {
 			if (!settings.isEmpty()) {
 				list.add(new Section(title, new ArrayList<>(settings)));
+			}
+			return this;
+		}
+
+		/** {@link #add}, with neighbouring toggles two to a row (long lists of switches). */
+		public Sections addColumns(String title, List<? extends Setting<?>> settings) {
+			if (!settings.isEmpty()) {
+				list.add(new Section(title, new ArrayList<>(settings), true));
 			}
 			return this;
 		}

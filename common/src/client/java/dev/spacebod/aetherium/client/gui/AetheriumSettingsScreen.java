@@ -71,7 +71,12 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 	}
 
 	/** One line of the list: a group title or a setting (with the page it lives on, shown while searching). */
-	private record Line(@Nullable String header, @Nullable Setting<?> setting, @Nullable String where) {
+	/** {@code second}: a toggle sharing the row with {@code setting}, drawn in the right half (sections with columns). */
+	private record Line(@Nullable String header, @Nullable Setting<?> setting, @Nullable String where, @Nullable Setting<?> second) {
+		Line(@Nullable String header, @Nullable Setting<?> setting, @Nullable String where) {
+			this(header, setting, where, null);
+		}
+
 	}
 
 	private final List<Hotspot> hotspots = new ArrayList<>();
@@ -298,7 +303,13 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 				y += HEADER;
 			} else {
 				if (y + ROW > y0 && y < y1) {
-					drawRow(g, font, line, x0, y, x1, y + ROW, mx, my);
+					if (line.second() != null) {
+						int mid = (x0 + x1) / 2;
+						drawRow(g, font, new Line(null, line.setting(), null), x0, y, mid - 1 - GAP / 2, y + ROW, mx, my);
+						drawRow(g, font, new Line(null, line.second(), null), mid + 1 + GAP / 2, y, x1, y + ROW, mx, my);
+					} else {
+						drawRow(g, font, line, x0, y, x1, y + ROW, mx, my);
+					}
 				}
 				y += ROW + GAP;
 			}
@@ -565,8 +576,16 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		if (!searching()) {
 			for (Setting.Section section : pages.get(page).sections().get()) {
 				lines.add(new Line(section.title(), null, null));
-				for (Setting<?> s : section.settings()) {
-					lines.add(new Line(null, s, null));
+				List<Setting<?>> settings = section.settings();
+				for (int i = 0; i < settings.size(); i++) {
+					Setting<?> s = settings.get(i);
+					Setting<?> next = i + 1 < settings.size() ? settings.get(i + 1) : null;
+					if (section.columns() && s.kind == Setting.Kind.TOGGLE && next != null && next.kind == Setting.Kind.TOGGLE) {
+						lines.add(new Line(null, s, null, next));
+						i++;
+					} else {
+						lines.add(new Line(null, s, null));
+					}
 				}
 			}
 			return lines;
@@ -593,6 +612,9 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		int n = 0;
 		for (Line line : lines()) {
 			if (line.setting() != null) {
+				n++;
+			}
+			if (line.second() != null) {
 				n++;
 			}
 		}
@@ -631,6 +653,17 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 			banners.add("Running on OpenGL: shader packs and GPU optimisations need Vulkan (Video Settings › Graphics API).");
 		}
 		return banners;
+	}
+
+	/** Opens the screen on the page with this id ({@code /aetherium diagnostics}). */
+	public static AetheriumSettingsScreen onPage(@Nullable Screen parent, String id) {
+		AetheriumSettingsScreen screen = new AetheriumSettingsScreen(parent);
+		for (int i = 0; i < screen.pages.size(); i++) {
+			if (screen.pages.get(i).id().equals(id)) {
+				screen.selectPage(i);
+			}
+		}
+		return screen;
 	}
 
 	/** Shows page {@code index} (wrapping); for scripted checks of every page. */

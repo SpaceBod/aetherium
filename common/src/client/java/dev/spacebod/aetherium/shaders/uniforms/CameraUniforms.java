@@ -12,6 +12,8 @@ import static dev.spacebod.aetherium.shaders.gl.uniform.UniformUpdateFrequency.P
 
 public class CameraUniforms {
 	private static final Minecraft client = Minecraft.getInstance();
+	/** cameraPosition and previousCameraPosition as last uploaded (diagnostics recordings). */
+	private static final double[] snapshot = new double[6];
 
 	private CameraUniforms() {
 	}
@@ -29,6 +31,11 @@ public class CameraUniforms {
 			.uniform3f(PER_FRAME, "cameraPositionFract", () -> getCameraPositionFract(getUnshiftedCameraPosition()))
 			.uniform3i(PER_FRAME, "previousCameraPositionInt", () -> getCameraPositionInt(tracker.getPreviousCameraPositionUnshifted()))
 			.uniform3f(PER_FRAME, "previousCameraPositionFract", () -> getCameraPositionFract(tracker.getPreviousCameraPositionUnshifted()));
+	}
+
+	/** cameraPosition (x, y, z) then previousCameraPosition, as the last frame computed them. */
+	public static double[] diagnosticsSnapshot() {
+		return snapshot.clone();
 	}
 
 	/** {@code far}: the render distance in blocks (not the projection's far plane). */
@@ -103,6 +110,12 @@ public class CameraUniforms {
 			currentCameraPositionUnshifted = getUnshiftedCameraPosition();
 
 			updateShift();
+			snapshot[0] = currentCameraPosition.x;
+			snapshot[1] = currentCameraPosition.y;
+			snapshot[2] = currentCameraPosition.z;
+			snapshot[3] = previousCameraPosition.x;
+			snapshot[4] = previousCameraPosition.y;
+			snapshot[5] = previousCameraPosition.z;
 		}
 
 		/**

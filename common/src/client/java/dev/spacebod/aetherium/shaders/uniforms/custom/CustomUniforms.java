@@ -307,6 +307,30 @@ public class CustomUniforms implements FunctionContext {
 		}
 	}
 
+	/** The scalar uniforms evaluated each frame with their current values (diagnostics recordings). */
+	public String describeScalars() {
+		StringBuilder out = new StringBuilder("{");
+		kroppeb.stareval.function.FunctionReturn value = new kroppeb.stareval.function.FunctionReturn();
+		for (CachedUniform u : activeOrder) {
+			Type type = u.getType();
+			String text;
+			if (type == Type.Int) {
+				u.writeTo(value);
+				text = Integer.toString(value.intReturn);
+			} else if (type == Type.Float) {
+				u.writeTo(value);
+				text = Float.toString(value.floatReturn);
+			} else if (type == Type.Boolean) {
+				u.writeTo(value);
+				text = Boolean.toString(value.booleanReturn);
+			} else {
+				continue;
+			}
+			out.append(out.length() > 1 ? "," : "").append(u.getName()).append(':').append(text);
+		}
+		return out.append('}').toString();
+	}
+
 	public void push(Object pass) {
 		Object2ObjectMap<CachedUniform, Binding> uniforms = this.locationMap.get(pass);
 		if (uniforms != null) {

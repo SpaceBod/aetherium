@@ -3,6 +3,7 @@ package dev.spacebod.aetherium.shaders.engine;
 import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.renderpearl.backend.vulkan.VulkanConst;
 import com.mojang.renderpearl.backend.vulkan.VulkanDevice;
+import dev.spacebod.aetherium.client.diag.Diagnostics;
 import dev.spacebod.aetherium.client.gpu.DeviceTraits;
 import dev.spacebod.aetherium.client.gpu.GeometryStages;
 import dev.spacebod.aetherium.client.gpu.VulkanCompute;
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -86,6 +88,8 @@ public final class PackStorage implements AutoCloseable {
 	private int height;
 	/** Resources were (re)created: the next frame's command buffer lays them out and zeroes or fills them. */
 	private boolean needsInit = true;
+	/** {@link Diagnostics#readback()}: boxes of the images copied back while a recording runs (made with the images). */
+	private @Nullable PackImageReadback readback;
 	/** Raw custom textures ({@link RawTextures}): created once, never resized, uploaded by the first frame. */
 	private final List<RawTextures.Texture> raws;
 	private final long[] rawImages;
@@ -234,6 +238,19 @@ public final class PackStorage implements AutoCloseable {
 		return setLayout;
 	}
 
+	/** The images (name, format, size, cleared each frame) and buffers, for diagnostics recordings. */
+	public String describe() {
+		StringBuilder out = new StringBuilder();
+		for (Image image : images) {
+			ImageInformation info = image.info();
+			out.append(out.isEmpty() ? "" : "; ").append(info.name()).append(' ').append(image.binding().format())
+					.append(' ').append(info.isRelative() ? "screen x" + info.relativeWidth() + "x" + info.relativeHeight()
+							: info.width() + "x" + info.height() + (info.target() == TextureType.TEXTURE_3D ? "x" + info.depth() : ""))
+					.append(info.clear() ? " cleared" : "");
+		}
+		return out.append(" | buffers ").append(buffers.size()).append(" | readback ").append(readback != null).toString();
+	}
+
 	public long descriptorSet() {
 		return set;
 	}
@@ -324,6 +341,9 @@ public final class PackStorage implements AutoCloseable {
 		vkImages = new long[count];
 		imageAllocations = new long[count];
 		imageViews = new long[count];
+		boolean copyBack = Diagnostics.readbackForNewImages();
+		List<PackImageReadback.Target> readbackTargets = new ArrayList<>();
+		int[] texelBytes = new int[count];
 		long total = 0;
 		try (MemoryStack stack = MemoryStack.stackPush()) {
 			LongBuffer out = stack.mallocLong(1);
@@ -344,7 +364,8 @@ public final class PackStorage implements AutoCloseable {
 						.imageType(imageType).format(image.vkFormat())
 						.extent(e -> e.width(fw).height(fh).depth(fd)).mipLevels(1).arrayLayers(1)
 						.samples(VK10.VK_SAMPLE_COUNT_1_BIT).tiling(VK10.VK_IMAGE_TILING_OPTIMAL)
-						.usage(VK10.VK_IMAGE_USAGE_STORAGE_BIT | VK10.VK_IMAGE_USAGE_SAMPLED_BIT | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+						.usage(VK10.VK_IMAGE_USAGE_STORAGE_BIT | VK10.VK_IMAGE_USAGE_SAMPLED_BIT | VK10.VK_IMAGE_USAGE_TRANSFER_DST_BIT
+								| (copyBack ? VK10.VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0))
 						.sharingMode(VK10.VK_SHARING_MODE_EXCLUSIVE).initialLayout(VK10.VK_IMAGE_LAYOUT_UNDEFINED);
 				int[] viewFormats = viewFormats(i, image.vkFormat());
 				if (viewFormats.length > 1) {
@@ -362,6 +383,11 @@ public final class PackStorage implements AutoCloseable {
 						null, out), "pack image view " + info.name());
 				imageViews[i] = out.get(0);
 				total += (long) w * h * d * bytesPerTexel(image.binding().format());
+				texelBytes[i] = bytesPerTexel(image.binding().format());
+				readbackTargets.add(new PackImageReadback.Target(info.name(), image.binding().format(), image.integer(), vkImages[i], new int[]{w, h, d}));
+			}
+			if (copyBack) {
+				readback = new PackImageReadback(vulkan, readbackTargets, texelBytes);
 			}
 			viewHandles = new long[views.size()];
 			for (int v = 0; v < views.size(); v++) {
@@ -444,6 +470,10 @@ public final class PackStorage implements AutoCloseable {
 		frame++;
 		VulkanCompute.barrier(cb, VK10.VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK10.VK_ACCESS_MEMORY_READ_BIT | VK10.VK_ACCESS_MEMORY_WRITE_BIT,
 				VK10.VK_PIPELINE_STAGE_TRANSFER_BIT, VK10.VK_ACCESS_TRANSFER_WRITE_BIT);
+		if (readback != null && !needsInit) {
+			readback.harvest(frame);
+			readback.record(cb, frame);
+		}
 		boolean init = needsInit;
 		needsInit = false;
 		try (MemoryStack stack = MemoryStack.stackPush()) {
@@ -669,6 +699,10 @@ public final class PackStorage implements AutoCloseable {
 	}
 
 	private void destroyResources() {
+		if (readback != null) {
+			readback.close();
+			readback = null;
+		}
 		for (long view : viewHandles) {
 			VK10.vkDestroyImageView(device, view, null);
 		}

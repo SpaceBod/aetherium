@@ -4,6 +4,7 @@ import com.mojang.blaze3d.Blaze3D;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.spacebod.aetherium.client.gpu.VulkanAccess;
 import dev.spacebod.aetherium.client.Crosshair;
+import dev.spacebod.aetherium.client.diag.Diagnostics;
 import dev.spacebod.aetherium.client.gui.Setting.Tag;
 import dev.spacebod.aetherium.client.zoom.Zoom;
 import dev.spacebod.aetherium.client.zoom.ZoomHud;
@@ -142,6 +143,7 @@ final class SettingsCatalog {
 		pages.add(page("shaders", "Shaders", "Shader packs and the shader engine", "☀", this::shaders));
 		pages.add(page("hud", "HUD", "Zoom, its readout and the crosshair", "⌕", this::hud));
 		pages.add(page("advanced", "Advanced", "Profile, tools and system", "⚙", this::advanced));
+		pages.add(page("diagnostics", "Diagnostics", "Tracking down a rendering problem", "⚑", this::diagnostics));
 		return pages;
 	}
 
@@ -342,6 +344,105 @@ final class SettingsCatalog {
 				.add("System", system())
 				.build();
 	}
+
+	private List<Setting.Section> diagnostics() {
+		Setting<String> record = Setting.action("aetherium.diag.record", "Record a diagnostics file",
+				"Records 600 frames, starting 3 s after you close this screen: what each frame did, the camera and shadow matrices, the pack's frame values and a GPU readback of the pack's images. Stand next to the problem, still at first, then walk a few blocks. The file goes to aetherium-diagnostics/.",
+				"Record", () -> {
+					Diagnostics.requestRecording();
+					host.toast("Recording starts 3 s after you close this screen", Theme.TEXT_DIM);
+				}).keywords("diagnostics record log");
+		Setting<String> status = Setting.info("aetherium.diag.status", "Recording", "The last recording, or the one in progress.", Diagnostics::status);
+		Setting<String> folder = Setting.action("aetherium.diag.folder", "Diagnostics folder", "Opens the folder recordings are saved in.", "Open",
+				() -> {
+					try {
+						java.nio.file.Files.createDirectories(Diagnostics.folder());
+					} catch (java.io.IOException ignored) {
+						// Opening shows the error instead.
+					}
+					Blaze3D.openPath(Diagnostics.folder());
+				});
+		Setting<Boolean> waitIdle = Setting.toggle("aetherium.diag.wait_idle", "Wait for the GPU every frame",
+						"Each frame starts only once the GPU has finished everything before it, so no work of two frames overlaps. Much slower. If a problem goes away with this on, it comes from work overlapping on the GPU. Off again after a restart.",
+						Diagnostics::waitIdle, Diagnostics::setWaitIdle)
+				.defaults(() -> false).immediate().tags(Tag.INSTANT);
+		Setting<Boolean> readback = Setting.toggle("aetherium.diag.readback", "Read back pack images",
+						"Recordings include a summary of the texels at the centre of every pack image (coloured-lighting volumes are centred on you). Off: the images are made exactly as in normal play. Reloads the pack.",
+						Diagnostics::readback, Diagnostics::setReadback)
+				.defaults(() -> true).afterApply(reloadPack);
+		Setting<Boolean> validation = Setting.toggle("aetherium.diag.validation", "Vulkan validation (next launch)",
+						"Starts the game with the Khronos validation layer, which checks every graphics command against the Vulkan rules and writes what it finds to latest.log. Needs the layer installed: the Vulkan SDK on Windows and Mac, the vulkan-validation-layers package on Linux. Much slower. Stays on until you turn it off.",
+						Diagnostics::validationAtLaunch, Diagnostics::setValidationAtLaunch)
+				.defaults(() -> false).tags(Tag.RESTART).restartPendingWhen(Diagnostics::validationRestartPending)
+				.keywords("vulkan validation layer");
+		Setting<Integer> frameLimit = Setting.intSlider("aetherium.diag.frame_limit", "Frame rate limit",
+						"The game's own frame rate limit (Video Settings), here so it can be changed while testing: some problems only show at high or low frame rates.",
+						10, 260, 10, () -> minecraft.options.framerateLimit().get(), v -> {
+							minecraft.options.framerateLimit().set(v);
+							minecraft.options.save();
+						}, v -> v >= 260 ? "Unlimited" : v + " fps")
+				.defaults(() -> 120);
+		Setting<Boolean> vsync = Setting.toggle("aetherium.diag.vsync", "VSync",
+						"The game's own VSync (Video Settings): frames wait for the display.",
+						() -> minecraft.options.enableVsync().get(), v -> {
+							minecraft.options.enableVsync().set(v);
+							minecraft.options.save();
+						})
+				.defaults(() -> true);
+		List<Setting<?>> pack = List.of(
+				packOption("TAA_DEFINE", "Pack: anti-aliasing (TAA_DEFINE)",
+						"Complementary and its edits: -1 off, 0 FXAA, 1 TAA (its own values). Pack's: the pack's own default. Reloads the pack.",
+						List.of("pack", "-1", "0", "1")),
+				packOption("COLORED_LIGHTING", "Pack: coloured lighting (COLORED_LIGHTING)",
+						"Complementary and its edits: 0 off, otherwise the light volume's size (128 = 4 chunks). Reloads the pack.",
+						List.of("pack", "0", "128", "192", "256")),
+				renderScale(), shadowDistance(), shadowMapScale());
+		Setting<String> allOff = Setting.action("aetherium.diag.all_off", "All optimisations off",
+				"Stages every optimisation off (the Baseline preset): Apply, then check whether the problem is still there. Some need a restart.",
+				"Stage", () -> preset(false));
+		List<Setting<?>> suspects = new ArrayList<>(List.of(allOff));
+		for (String group : List.of(SHADER_ENGINE, MEMORY, EXPERIMENTAL)) {
+			suspects.addAll(group(group));
+		}
+		return new Setting.Sections()
+				.add("Recording", List.of(record, status, folder))
+				.addColumns("Tests", List.of(waitIdle, readback, validation, vsync, frameLimit))
+				.add("Shader pack", pack)
+				.addColumns("Optimisations", suspects)
+				.build();
+	}
+
+	/** One option of the active pack, written to its options file and applied with a reload ("pack": the file's value). */
+	private Setting<String> packOption(String key, String name, String description, List<String> values) {
+		java.util.function.Supplier<String> current = () -> ShaderPackSettings.activePack()
+				.map(p -> ShaderPackSettings.readOptions(p).getOrDefault(key, "pack")).orElse("pack");
+		return Setting.choice("aetherium.diag.pack." + key, name, description, () -> {
+							// A value the options file holds outside the list stays reachable.
+							List<String> all = new ArrayList<>(values);
+							if (!all.contains(current.get())) {
+								all.add(current.get());
+							}
+							return all;
+						}, current,
+						v -> ShaderPackSettings.activePack().ifPresent(p -> {
+							Map<String, String> options = new java.util.TreeMap<>(ShaderPackSettings.readOptions(p));
+							if (v.equals("pack")) {
+								options.remove(key);
+							} else {
+								options.put(key, v);
+							}
+							ShaderPackSettings.writeOptions(p, options);
+						}), v -> v.equals("pack") ? "Pack's" : v)
+				.unavailableWhen(() -> ShaderPackSettings.activePack().isEmpty() ? "No shader pack" : null)
+				.afterApply(reloadPack);
+	}
+
+	/** One pack reload per Apply, whichever diagnostics pack settings changed. */
+	private final Runnable reloadPack = () -> {
+		if (ShaderPackSettings.activePack().isPresent()) {
+			ShaderPackEngine.get().reload();
+		}
+	};
 
 	private List<Setting<?>> system() {
 		List<Setting<?>> rows = new ArrayList<>();

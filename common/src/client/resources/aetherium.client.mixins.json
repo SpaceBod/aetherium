@@ -17,6 +17,8 @@
 		"access.RenderTypeAccessor",
 		"access.RenderTargetAccessor",
 		"compat.PolytoneLeashMixin",
+		"diag.ClientPacketListenerDiagnosticsMixin",
+		"diag.VulkanBackendValidationMixin",
 		"chunks.BlockRendererMixin",
 		"chunks.ChunkRendererAccessor",
 		"chunks.ChunkMeshFormatsMixin",
