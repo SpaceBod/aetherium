@@ -114,6 +114,12 @@ public final class BenchDriver {
 	private long playStart;
 	private static final int BURST = System.getenv("AETHERIUM_PLAY_BURST") == null ? 0 : Integer.parseInt(System.getenv("AETHERIUM_PLAY_BURST"));
 	private int burstTaken;
+	private static final boolean BURST_FRAMES = System.getenv("AETHERIUM_PLAY_BURST_FRAMES") != null;
+	private static final double WALK = System.getenv("AETHERIUM_PLAY_WALK") == null ? 0 : Double.parseDouble(System.getenv("AETHERIUM_PLAY_WALK"));
+	private static final int STEP = System.getenv("AETHERIUM_PLAY_STEP") == null ? 0 : Integer.parseInt(System.getenv("AETHERIUM_PLAY_STEP"));
+	private int stepTicks;
+	private static final boolean PLAY_DIAG = System.getenv("AETHERIUM_PLAY_DIAG") != null;
+	private boolean diagRequested;
 	private boolean playMenuOpened;
 	private boolean playScreenshot;
 	/**
@@ -173,6 +179,12 @@ public final class BenchDriver {
 	// ---------------------------------------------------------------- frame hooks (render thread)
 
 	public void frameBegin(Minecraft mc) {
+		if (phase == Phase.PLAY && BURST_FRAMES && playScreenshot && burstTaken < BURST && seconds(System.nanoTime() - playStart) >= 16) {
+			// AETHERIUM_PLAY_BURST_FRAMES=1: the burst takes the last finished frame at every frame start, not once a tick.
+			net.minecraft.client.Screenshot.grab(mc.gameDirectory, "aetherium-burst-" + burstTaken + ".png", mc.gameRenderer.mainRenderTarget(), 1, message -> {
+			});
+			burstTaken++;
+		}
 		if (phase == Phase.SAVING || phase == Phase.DONE || phase == Phase.PLAY) {
 			return;
 		}
@@ -348,6 +360,7 @@ public final class BenchDriver {
 							case "settings" -> new dev.spacebod.aetherium.client.gui.AetheriumSettingsScreen(null);
 							// =video: vanilla's Video Settings (with our entry buttons), then ours from it after 4 s.
 							case "video" -> new net.minecraft.client.gui.screens.options.VideoSettingsScreen(null, mc, mc.options);
+							case "diagnostics" -> dev.spacebod.aetherium.client.gui.AetheriumSettingsScreen.onPage(null, "diagnostics");
 							default -> new dev.spacebod.aetherium.shaders.gui.ShaderPackScreen(null);
 						});
 					}
@@ -355,7 +368,7 @@ public final class BenchDriver {
 							&& mc.gui.screen() instanceof net.minecraft.client.gui.screens.options.VideoSettingsScreen video) {
 						mc.gui.setScreen(new dev.spacebod.aetherium.client.gui.AetheriumSettingsScreen(video));
 					}
-					if (playMenuOpened && mc.gui.screen() instanceof dev.spacebod.aetherium.client.gui.AetheriumSettingsScreen settings) {
+					if (playMenuOpened && "settings".equals(menu) && mc.gui.screen() instanceof dev.spacebod.aetherium.client.gui.AetheriumSettingsScreen settings) {
 						settings.showPage((int) seconds(now - playStart) - 8);
 					}
 					if (!playScreenshot && seconds(now - playStart) >= 15) {
@@ -369,8 +382,28 @@ public final class BenchDriver {
 						dev.spacebod.aetherium.shaders.config.ShaderPackSettings.setActivePack(pack.equalsIgnoreCase("off") ? null : pack);
 						dev.spacebod.aetherium.shaders.engine.ShaderPackEngine.get().reload();
 					}
+					// AETHERIUM_PLAY_DIAG=1: a diagnostics recording, requested 10 s in (it starts 3 s later, with no menu open).
+					if (PLAY_DIAG && !diagRequested && seconds(now - playStart) >= 10) {
+						diagRequested = true;
+						dev.spacebod.aetherium.client.diag.Diagnostics.requestRecording();
+					}
+					// AETHERIUM_PLAY_WALK=<blocks per second>: from 15 s in, the player walks the way it faces until the burst is
+					// done (flicker that only shows while the camera moves).
+					if (WALK != 0 && mc.player != null && seconds(now - playStart) >= 15 && burstTaken < BURST) {
+						double yaw = Math.toRadians(mc.player.getYRot());
+						double step = WALK / 20.0;
+						mc.player.setPos(mc.player.getX() - Math.sin(yaw) * step, mc.player.getY(), mc.player.getZ() + Math.cos(yaw) * step);
+					}
+					// AETHERIUM_PLAY_STEP=<ticks>: from 15 s in, the player moves exactly one block along -x every that many
+					// ticks and stands still in between, until the burst is done (each step crosses a block boundary).
+					if (STEP > 0 && mc.player != null && seconds(now - playStart) >= 15 && burstTaken < BURST && ++stepTicks % STEP == 0) {
+						mc.player.setPos(mc.player.getX() - 1.0, mc.player.getY(), mc.player.getZ());
+						mc.player.xo = mc.player.getX();
+						mc.player.xOld = mc.player.getX();
+						Aetherium.LOG.info("Play: step at burst frame {}", burstTaken);
+					}
 					// AETHERIUM_PLAY_BURST=N: N more shots on consecutive ticks (flicker diagnosis: nothing moves, time frozen).
-					if (playScreenshot && burstTaken < BURST && seconds(now - playStart) >= 16) {
+					if (!BURST_FRAMES && playScreenshot && burstTaken < BURST && seconds(now - playStart) >= 16) {
 						net.minecraft.client.Screenshot.grab(mc.gameDirectory, "aetherium-burst-" + burstTaken + ".png", mc.gameRenderer.mainRenderTarget(), 1,
 								message -> {
 								});
