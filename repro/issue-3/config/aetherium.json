@@ -1,0 +1,22 @@
+{
+  "profile": "default",
+  "optimisations": {
+    "gpu.pipeline_cache": true,
+    "shaders.flip_only_doubles": false,
+    "shaders.inline_compute": false,
+    "shaders.narrow_barrier": false
+  },
+  "bench": {
+    "gpuTimers": false,
+    "passTimers": false
+  },
+  "shaders": {
+    "enabled": true,
+    "pack": "ComplementaryUnbound_r5.9.3 + EuphoriaPatches_1.10.5",
+    "renderScale": 75,
+    "upscaleSharpness": 60
+  },
+  "zoom": {
+    "corner": "bottom_right"
+  }
+}
