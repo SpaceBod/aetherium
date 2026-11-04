@@ -38,6 +38,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class ShaderPackSettings {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+	private static final ActivePackCache ACTIVE_PACK = new ActivePackCache();
 
 	private ShaderPackSettings() {
 	}
@@ -65,17 +66,16 @@ public final class ShaderPackSettings {
 	/** The configured pack when shaders are enabled, else empty. */
 	public static Optional<String> activePack() {
 		try {
-			JsonObject root = readConfig();
-			if (!root.has("shaders")) {
-				return Optional.empty();
-			}
-			JsonObject shaders = root.getAsJsonObject("shaders");
-			boolean enabled = !shaders.has("enabled") || shaders.get("enabled").getAsBoolean();
-			return enabled && shaders.has("pack") ? Optional.of(shaders.get("pack").getAsString()) : Optional.empty();
+			return ACTIVE_PACK.get(configFile());
 		} catch (IOException | RuntimeException e) {
 			AetheriumShaders.logger.warn("could not read {}", configFile(), e);
 			return Optional.empty();
 		}
+	}
+
+	/** Re-read the active pack choice on the next lookup, for an explicit reload or a newly opened pack screen. */
+	public static void invalidateActivePack() {
+		ACTIVE_PACK.invalidate();
 	}
 
 	/** The configured pack, whether or not shaders are enabled. */
@@ -101,6 +101,7 @@ public final class ShaderPackSettings {
 			}
 			root.add("shaders", shaders);
 			writeAtomically(configFile(), GSON.toJson(root).getBytes(StandardCharsets.UTF_8));
+			ACTIVE_PACK.saved(pack);
 		} catch (IOException | RuntimeException e) {
 			AetheriumShaders.logger.error("could not write {}", configFile(), e);
 		}

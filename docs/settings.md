@@ -107,3 +107,7 @@ All under `.minecraft/`.
 ```
 
 Every key is optional; anything missing takes its default.
+
+The active shader-pack choice is cached while playing. After editing `shaders.enabled` or `shaders.pack` in the file,
+open the shader pack screen or use the shader reload key to read the new choice. Changes made through the screen or
+the shader toggle key take effect immediately.

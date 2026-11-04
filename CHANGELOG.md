@@ -7,6 +7,9 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- The active shader-pack choice is cached instead of reading and parsing the config during terrain mesh checks on
+  every frame, including while shaders are off. Saved changes update it immediately; opening the pack screen or
+  explicitly reloading picks up external config edits.
 - Compute programs that run at the start of a frame or of the shadow pass (`setup` and `shadow`) see that frame's
   camera and shadow matrices and custom uniforms instead of the previous frame's. With the shadow cache on, a frame
   whose shadow compute reads the shadow matrices no longer keeps the previous light angle in them for the whole frame.

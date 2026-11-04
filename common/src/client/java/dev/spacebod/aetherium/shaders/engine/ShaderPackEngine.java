@@ -242,6 +242,7 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 		if (gbufferPassOpen || shadowPassOpen) {
 			throw new IllegalStateException("reload inside a render pass");
 		}
+		ShaderPackSettings.invalidateActivePack();
 		disable();
 		state = State.UNLOADED;
 		lastError = null;
