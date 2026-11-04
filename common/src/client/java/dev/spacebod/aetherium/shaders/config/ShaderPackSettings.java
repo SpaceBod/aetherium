@@ -39,6 +39,8 @@ import org.jspecify.annotations.Nullable;
 public final class ShaderPackSettings {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final ActivePackCache ACTIVE_PACK = new ActivePackCache();
+	/** The last failure {@link #activePack()} logged, until a lookup succeeds or the choice is invalidated. */
+	private static volatile @Nullable String lastActivePackError;
 
 	private ShaderPackSettings() {
 	}
@@ -66,9 +68,18 @@ public final class ShaderPackSettings {
 	/** The configured pack when shaders are enabled, else empty. */
 	public static Optional<String> activePack() {
 		try {
-			return ACTIVE_PACK.get(configFile());
+			Optional<String> pack = ACTIVE_PACK.get(configFile());
+			if (lastActivePackError != null) {
+				lastActivePackError = null;
+			}
+			return pack;
 		} catch (IOException | RuntimeException e) {
-			AetheriumShaders.logger.warn("could not read {}", configFile(), e);
+			// A broken file is retried on every lookup, which runs each frame: report each distinct failure once.
+			String error = e.toString();
+			if (!error.equals(lastActivePackError)) {
+				lastActivePackError = error;
+				AetheriumShaders.logger.warn("could not read {}", configFile(), e);
+			}
 			return Optional.empty();
 		}
 	}
@@ -76,6 +87,8 @@ public final class ShaderPackSettings {
 	/** Re-read the active pack choice on the next lookup, for an explicit reload or a newly opened pack screen. */
 	public static void invalidateActivePack() {
 		ACTIVE_PACK.invalidate();
+		// An explicit reload reports a still-broken file again.
+		lastActivePackError = null;
 	}
 
 	/** The configured pack, whether or not shaders are enabled. */
@@ -211,7 +224,11 @@ public final class ShaderPackSettings {
 	}
 
 	private static JsonObject readConfig() throws IOException {
-		Path file = configFile();
+		return readConfig(configFile());
+	}
+
+	/** The settings file's root object, empty when the file does not exist yet. */
+	static JsonObject readConfig(Path file) throws IOException {
 		if (!Files.isRegularFile(file)) {
 			return new JsonObject();
 		}

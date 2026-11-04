@@ -1,10 +1,7 @@
 package dev.spacebod.aetherium.shaders.config;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -20,8 +17,7 @@ final class ActivePackCache {
 		}
 		synchronized (this) {
 			if (value == null) {
-				JsonObject root = Files.isRegularFile(file)
-						? JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject() : new JsonObject();
+				JsonObject root = ShaderPackSettings.readConfig(file);
 				JsonObject shaders = root.has("shaders") ? root.getAsJsonObject("shaders") : null;
 				boolean enabled = shaders != null && (!shaders.has("enabled") || shaders.get("enabled").getAsBoolean());
 				value = enabled && shaders.has("pack") ? Optional.of(shaders.get("pack").getAsString()) : Optional.empty();
