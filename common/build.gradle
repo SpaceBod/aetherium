@@ -48,3 +48,4 @@ dependencies {
 }
 
 microbenchTask('targetImageChecks', 'dev.spacebod.aetherium.shaders.engine.TargetImageFixtures', 'Checks target image formats and allocation flags')
+microbenchTask('activePackCacheChecks', 'dev.spacebod.aetherium.shaders.config.ActivePackCacheFixtures', 'Checks cached pack choices, saves and reloads')

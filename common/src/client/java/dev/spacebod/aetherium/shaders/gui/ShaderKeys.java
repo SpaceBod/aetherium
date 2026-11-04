@@ -59,6 +59,7 @@ public final class ShaderKeys {
 		}
 		while (RELOAD.consumeClick()) {
 			if (minecraft.gui.screen() == null) {
+				ShaderPackSettings.invalidateActivePack();
 				Optional<String> active = ShaderPackSettings.activePack();
 				if (active.isEmpty()) {
 					message(minecraft, Component.translatable("message.aetherium.shaders_none"));

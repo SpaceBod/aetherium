@@ -167,6 +167,7 @@ public final class ShaderPackScreen extends Screen {
 	public ShaderPackScreen(@Nullable Screen parent) {
 		super(TITLE);
 		this.parent = parent;
+		ShaderPackSettings.invalidateActivePack();
 		this.active = ShaderPackSettings.activePack().orElse(null);
 		this.selected = active;
 	}
