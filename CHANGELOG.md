@@ -7,6 +7,9 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- Block outlines, entity hitboxes and chunk borders show with packs that have no `gbuffers_line` program and draw
+  lines with `gbuffers_basic` (Mellow, BSL): those lines are widened on screen instead of drawing with no width.
+  A pack's own `gbuffers_line` still widens its lines itself.
 - Entity, block-entity and item ids above 32767 from a pack's id maps reached the shaders as negative numbers, so
   anything a pack keys on them did nothing: end crystals and iron golem eyes did not glow with Complementary and
   Euphoria Patches, whose entity ids start at 50000. Ids now carry their full 16-bit range, up to 65535.
