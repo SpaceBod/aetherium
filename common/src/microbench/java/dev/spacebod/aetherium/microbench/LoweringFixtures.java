@@ -49,8 +49,11 @@ final class LoweringFixtures {
 	private record Fixture(String name, Kind kind, String vertex, String geometry, String fragment, List<Check> checks) {
 	}
 
-	/** {@code *_METAL}: lowered for a MoltenVK device (Metal: no geometry stages), as on macOS. */
-	private enum Kind { FULLSCREEN, FULLSCREEN_METAL, WORLD, WORLD_METAL, WORLD_GLINT, WORLD_GRAYSCALE, WORLD_CLOUDS, COMPUTE }
+	/**
+	 * {@code *_METAL}: lowered for a MoltenVK device (Metal: no geometry stages), as on macOS. {@code WORLD_LINES}: the pack's
+	 * own gbuffers_line; {@code WORLD_LINES_FALLBACK}: another program (gbuffers_basic) drawing the line pipelines.
+	 */
+	private enum Kind { FULLSCREEN, FULLSCREEN_METAL, WORLD, WORLD_METAL, WORLD_GLINT, WORLD_GRAYSCALE, WORLD_CLOUDS, WORLD_LINES, WORLD_LINES_FALLBACK, COMPUTE }
 
 	private record Check(String what, Predicate<Reflected> test) {
 	}
@@ -266,9 +269,12 @@ final class LoweringFixtures {
 				}
 				default -> {
 					boolean clouds = f.kind() == Kind.WORLD_CLOUDS;
-					List<VertexFormat> formats = clouds ? List.of() : List.of(DefaultVertexFormat.ENTITY);
+					boolean lines = f.kind() == Kind.WORLD_LINES;
+					boolean lineFormat = lines || f.kind() == Kind.WORLD_LINES_FALLBACK;
+					List<VertexFormat> formats = clouds ? List.of()
+							: List.of(lineFormat ? DefaultVertexFormat.POSITION_COLOR_NORMAL_LINE_WIDTH : DefaultVertexFormat.ENTITY);
 					WorldInterface.Prepared p = WorldInterface.prepare(f.name(), f.vertex(), f.geometry(), f.fragment(), formats,
-							VanillaInterface.TransformSource.DYNAMIC, AlphaTests.ONE_TENTH_ALPHA, false, false, clouds, false, false,
+							VanillaInterface.TransformSource.DYNAMIC, AlphaTests.ONE_TENTH_ALPHA, false, lines, clouds, false, false,
 							new int[]{0, 1}, new int[]{0, 1}, false, f.kind() == Kind.WORLD_GLINT
 									? new dev.spacebod.aetherium.shaders.pipeline.transform.lowering.LoweringParameters.Glint(true, 0)
 									: dev.spacebod.aetherium.shaders.pipeline.transform.lowering.LoweringParameters.Glint.NONE,
@@ -667,6 +673,35 @@ final class LoweringFixtures {
 						"void main() { albedo = texture(gtexture, uv) * texelFetch(gtexture, ivec2(0), 0); data = vec4(textureSize(gtexture, 0), 0, 1) + own(gtexture); }"),
 				List.of(check("texel reads .rrrr, size query and shadowing parameter untouched", r -> r.sources().get(F).contains("(texture(Sampler0, uv)).rrrr") && r.sources().get(F).contains("(texelFetch(Sampler0, ivec2(0), 0)).rrrr")
 						&& !r.sources().get(F).contains("(textureSize(Sampler0, 0)).rrrr") && r.sources().get(F).contains("return texture(gtexture, uv);")))));
+		// Vanilla draws a line as a quad whose two vertices per end share a position; the line width input and the
+		// normal (the direction to the other end) let the vertex stage push them apart in screen space.
+		for (String version : List.of("#version 400 compatibility", "#version 120")) {
+			out.add(new Fixture("lines: " + version + " gbuffers_basic fallback widened", Kind.WORLD_LINES_FALLBACK,
+					glsl(version, "varying vec4 tint;", "void main() { tint = gl_Color; gl_Position = ftransform(); }"),
+					null,
+					glsl(version, "varying vec4 tint;", "void main() { gl_FragData[0] = tint; }"),
+					List.of(check("both ends transformed, widened by the line width input",
+							r -> r.sources().get(V).contains("aeth_widen_lines") && r.has(V, "in ") && r.stage(V).stream().anyMatch(l -> l.contains("LineWidth"))))));
+		}
+		out.add(new Fixture("lines: #version 130 gbuffers_line on the core inputs left as written", Kind.WORLD_LINES,
+				glsl("#version 130", "uniform float viewWidth;", "uniform float viewHeight;", "uniform mat4 modelViewMatrix;", "uniform mat4 projectionMatrix;",
+						"in vec3 vaPosition;", "in vec3 vaNormal;", "varying vec4 tint;",
+						"void main() { vec2 screenSize = vec2(viewWidth, viewHeight);",
+						"vec4 a = projectionMatrix * modelViewMatrix * vec4(vaPosition, 1.0);",
+						"vec4 b = projectionMatrix * modelViewMatrix * vec4(vaPosition + vaNormal, 1.0);",
+						"vec2 dir = normalize((b.xy / b.w - a.xy / a.w) * screenSize); tint = gl_Color;",
+						"gl_Position = vec4(a.xy + vec2(-dir.y, dir.x) * (gl_VertexID % 2 == 0 ? 2.0 : -2.0) / screenSize * a.w, a.zw); }"),
+				null,
+				glsl("#version 130", "varying vec4 tint;", "void main() { gl_FragData[0] = tint; }"),
+				List.of(check("no second widening", r -> !r.sources().get(V).contains("aeth_widen_lines")))));
+		out.add(new Fixture("lines: core-profile gbuffers_line left as written", Kind.WORLD_LINES,
+				glsl("#version 330 core", "in vec3 vaPosition;", "in vec3 vaNormal;", "in vec4 vaColor;", "out vec4 tint;",
+						"uniform mat4 modelViewMatrix;", "uniform mat4 projectionMatrix;",
+						"void main() { vec4 a = projectionMatrix * modelViewMatrix * vec4(vaPosition, 1.0);",
+						"vec4 b = projectionMatrix * modelViewMatrix * vec4(vaPosition + vaNormal, 1.0); tint = vaColor; gl_Position = a + (b - a) * 0.01; }"),
+				null,
+				glsl("#version 330 core", "in vec4 tint;", "layout(location = 0) out vec4 color;", "void main() { color = tint; }"),
+				List.of(check("no second widening", r -> !r.sources().get(V).contains("aeth_widen_lines")))));
 		out.add(new Fixture("clouds: injected isamplerBuffer stays a texel buffer (world)", Kind.WORLD_CLOUDS,
 				// Version 120 as the packs write it: the parser only knows isamplerBuffer as a type from 140 on.
 				glsl("#version 120", "varying vec2 uv;", "varying vec4 tint;",

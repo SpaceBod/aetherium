@@ -7,6 +7,9 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- Block outlines, entity hitboxes and chunk borders show with packs that have no `gbuffers_line` program and draw
+  lines with `gbuffers_basic` (Mellow, BSL): those lines are widened on screen instead of drawing with no width.
+  A pack's own `gbuffers_line` still widens its lines itself.
 - The active shader-pack choice is cached instead of reading and parsing the config during terrain mesh checks on
   every frame, including while shaders are off. Saved changes update it immediately; opening the pack screen or
   explicitly reloading picks up external config edits. A malformed config is reported once instead of on every frame.

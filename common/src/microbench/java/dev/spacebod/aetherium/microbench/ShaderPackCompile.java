@@ -713,10 +713,11 @@ final class ShaderPackCompile {
 					chunks ? VanillaInterface.TransformSource.TERRAIN_REGION
 							: terrain ? VanillaInterface.TransformSource.TERRAIN_MULTIDRAW
 							: entityShadow ? VanillaInterface.TransformSource.DYNAMIC_SHADOW : VanillaInterface.TransformSource.DYNAMIC,
-					AlphaTests.ONE_TENTH_ALPHA, false, name.endsWith("line"), name.endsWith("clouds"), name.contains("glint"), false, buffers, buffers,
+					AlphaTests.ONE_TENTH_ALPHA, false, name.equals("gbuffers_line"), name.endsWith("clouds"), name.contains("glint"), false, buffers, buffers,
 					name.startsWith("shadow"));
 			if (name.equals(System.getenv("AETHERIUM_DUMP"))) {
 				System.out.println("===== " + name + " resources " + prepared.resources());
+				prepared.stages().forEach((type, glsl) -> System.out.println("===== " + name + " " + type + "\n" + glsl));
 			}
 			return prepared.stages();
 		}

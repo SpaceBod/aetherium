@@ -210,7 +210,10 @@ public final class WorldProgram implements AutoCloseable {
 			transformSource = VanillaInterface.TransformSource.DYNAMIC_SHADOW;
 		}
 		AlphaTest alpha = source.getDirectives().getAlphaTestOverride().orElse(key.getAlphaTest());
-		boolean lines = !vertexPulled && formats.getFirst().contains("LineWidth");
+		// The pack's own gbuffers_line is written against the core inputs and widens its lines itself. Lines drawn with
+		// another program (the gbuffers_basic fallback) follow that program's profile, and the compatibility path
+		// widens them (the line format's LineWidth input).
+		boolean lines = !vertexPulled && formats.getFirst().contains("LineWidth") && ProgramId.Line.getSourceName().equals(source.getName());
 		long started = System.nanoTime();
 		// Single-pass enchantment glint (26.3's GLINT define): the item's program adds vanilla's glint term itself, unless
 		// the pack has its own glint program, which draws over the item afterwards (glintPass).
