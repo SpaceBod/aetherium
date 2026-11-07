@@ -11,8 +11,9 @@ import org.lwjgl.system.MemoryUtil;
  * The entity and world-text vertex formats shader packs read, while a pack draws the world: vanilla's elements at their
  * own offsets, then
  * <ul>
- *   <li>{@code Entity} ({@code ivec3}: entity id, block entity id, item id from the pack's id maps, captured when the
- *       draw was submitted; packs read them as {@code entityId}, {@code blockEntityId}, {@code currentRenderedItemId});</li>
+ *   <li>{@code Entity} (unsigned 16-bit: entity id, block entity id, item id from the pack's id maps, captured when the
+ *       draw was submitted, so ids up to 65535 survive; packs read them as {@code entityId}, {@code blockEntityId},
+ *       {@code currentRenderedItemId});</li>
  *   <li>{@code mc_midTexCoord} (centre of the quad's texture) and {@code at_tangent} (xyz + handedness), per quad;</li>
  *   <li>world text also gets {@code Normal}, computed per quad (vanilla's glyphs carry none).</li>
  * </ul>
@@ -30,7 +31,7 @@ public final class EntityVertexFormats {
 			.addAttribute("UV1", GpuFormat.RG16_SINT)
 			.addAttribute("UV2", GpuFormat.RG16_SINT)
 			.addAttribute("Normal", GpuFormat.RGBA8_SNORM)
-			.addAttribute("Entity", GpuFormat.RGBA16_SINT)
+			.addAttribute("Entity", GpuFormat.RGBA16_UINT)
 			.addAttribute("mc_midTexCoord", GpuFormat.RG32_FLOAT)
 			.addAttribute("at_tangent", GpuFormat.RGBA8_SNORM)
 			.build();
@@ -45,7 +46,7 @@ public final class EntityVertexFormats {
 			.addAttribute("UV2", GpuFormat.RG16_SINT)
 			.addAttribute("Color", GpuFormat.RGBA8_UNORM)
 			.addAttribute("Normal", GpuFormat.RGBA8_SNORM)
-			.addAttribute("Entity", GpuFormat.RGBA16_SINT)
+			.addAttribute("Entity", GpuFormat.RGBA16_UINT)
 			.addAttribute("mc_midTexCoord", GpuFormat.RG32_FLOAT)
 			.addAttribute("at_tangent", GpuFormat.RGBA8_SNORM)
 			.build();

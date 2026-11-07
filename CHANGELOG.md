@@ -7,6 +7,9 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ### Fixed
 
+- Entity, block-entity and item ids above 32767 from a pack's id maps reached the shaders as negative numbers, so
+  anything a pack keys on them did nothing: end crystals and iron golem eyes did not glow with Complementary and
+  Euphoria Patches, whose entity ids start at 50000. Ids now carry their full 16-bit range, up to 65535.
 - The active shader-pack choice is cached instead of reading and parsing the config during terrain mesh checks on
   every frame, including while shaders are off. Saved changes update it immediately; opening the pack screen or
   explicitly reloading picks up external config edits. A malformed config is reported once instead of on every frame.

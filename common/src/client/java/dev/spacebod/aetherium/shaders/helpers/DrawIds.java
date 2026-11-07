@@ -133,10 +133,16 @@ public final class DrawIds {
 	/** Restores ids {@link #capture} packed. */
 	public static void apply(long packed) {
 		CapturedRenderingState s = CapturedRenderingState.INSTANCE;
-		s.setCurrentEntity((short) packed);
-		s.setCurrentBlockEntity((short) (packed >>> 16));
-		s.setCurrentRenderedItem((short) (packed >>> 32));
+		s.setCurrentEntity(unpackId(packed));
+		s.setCurrentBlockEntity(unpackId(packed >>> 16));
+		s.setCurrentRenderedItem(unpackId(packed >>> 32));
 		flags = (int) (packed >>> 48) & 0xFF;
+	}
+
+	/** One 16-bit id of {@link #capture}: 0 to 65534, or -1 (no id in the pack's map), as the id maps return them. */
+	private static int unpackId(long bits) {
+		int id = (int) bits & 0xFFFF;
+		return id == 0xFFFF ? -1 : id;
 	}
 
 	public static void clear() {
