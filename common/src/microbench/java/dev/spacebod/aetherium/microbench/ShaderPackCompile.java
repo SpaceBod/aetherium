@@ -656,9 +656,15 @@ final class ShaderPackCompile {
 				// compiler accepts: checked here so the harness fails where the game would.
 				String struct = code == null || type == PatchShaderType.COMPUTE ? null : SpirvInterface.reflect(code, false).stream()
 						.filter(l -> (l.startsWith("in ") || l.startsWith("out ")) && l.contains(" t15x")).findFirst().orElse(null);
+				// A vertex input must have its vertex format's numeric type (signed, unsigned or float); Vulkan leaves a
+				// mismatch undefined (an unsigned id read as signed comes back negative above 32767).
+				String mismatch = code == null || type != PatchShaderType.VERTEX ? null : vertexInputMismatch(program.name(), SpirvInterface.reflect(code, false));
 				if (struct != null) {
 					errors.put(type, "error: '…' : struct interface variable (vanilla's pipeline builder rejects it)");
 					rawErrors.put(program.name() + type, "struct interface variable: " + struct);
+				} else if (mismatch != null) {
+					errors.put(type, "error: '…' : vertex input type differs from its vertex format");
+					rawErrors.put(program.name() + type, "vertex input type differs from its vertex format: " + mismatch);
 				} else if (code != null) {
 					spirv.put(type, code);
 				} else {
@@ -671,6 +677,35 @@ final class ShaderPackCompile {
 	}
 
 	private static final Map<String, String> rawErrors = new HashMap<>();
+	/** The vertex formats each world program was lowered against ({@link #lower}). */
+	private static final Map<String, List<com.mojang.renderpearl.api.vertex.VertexFormat>> programFormats = new HashMap<>();
+
+	/** The first vertex input whose numeric type is not its format element's, as "name: shader type vs format", or null. */
+	private static String vertexInputMismatch(String program, List<String> reflected) {
+		List<com.mojang.renderpearl.api.vertex.VertexFormat> formats = programFormats.get(program);
+		if (formats == null) {
+			return null;
+		}
+		Map<String, com.mojang.renderpearl.api.GpuFormat> elements = new HashMap<>();
+		for (var format : formats) {
+			if (format != null) {
+				format.getElements().forEach(e -> elements.putIfAbsent(WorldInterface.shaderAttributeName(e.name()), e.format()));
+			}
+		}
+		for (String line : reflected) {
+			String[] p = line.split(" ");
+			if (!p[0].equals("in") || p.length < 4 || !elements.containsKey(p[2])) {
+				continue;
+			}
+			String format = elements.get(p[2]).name();
+			int expected = format.endsWith("_SINT") ? org.lwjgl.util.spvc.Spvc.SPVC_BASETYPE_INT32
+					: format.endsWith("_UINT") ? org.lwjgl.util.spvc.Spvc.SPVC_BASETYPE_UINT32 : org.lwjgl.util.spvc.Spvc.SPVC_BASETYPE_FP32;
+			if (!p[3].startsWith("t" + expected + "x")) {
+				return p[2] + ": " + p[3] + " vs " + format;
+			}
+		}
+		return null;
+	}
 
 	/** The stages exactly as the engine hands them to vanilla's compiler, for the current lowering mode. */
 	private static Map<PatchShaderType, String> lower(Program program) {
@@ -715,6 +750,7 @@ final class ShaderPackCompile {
 							: entityShadow ? VanillaInterface.TransformSource.DYNAMIC_SHADOW : VanillaInterface.TransformSource.DYNAMIC,
 					AlphaTests.ONE_TENTH_ALPHA, false, name.equals("gbuffers_line"), name.endsWith("clouds"), name.contains("glint"), false, buffers, buffers,
 					name.startsWith("shadow"));
+			programFormats.put(name, formats);
 			if (name.equals(System.getenv("AETHERIUM_DUMP"))) {
 				System.out.println("===== " + name + " resources " + prepared.resources());
 				prepared.stages().forEach((type, glsl) -> System.out.println("===== " + name + " " + type + "\n" + glsl));

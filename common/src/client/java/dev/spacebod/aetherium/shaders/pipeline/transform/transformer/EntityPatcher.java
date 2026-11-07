@@ -135,10 +135,10 @@ public class EntityPatcher {
 		if (parameters.type.glShaderType == ShaderType.VERTEX) {
 			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 				"flat out ivec3 aeth_entityInfo;",
-				"in ivec3 aeth_Entity;");
+				"in uvec3 aeth_Entity;");
 
 			tree.prependMainFunctionBody(t,
-				"aeth_entityInfo = aeth_Entity;");
+				"aeth_entityInfo = ivec3(aeth_Entity);");
 		} else if (parameters.type.glShaderType == ShaderType.TESSELATION_CONTROL) {
 			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 				"flat out ivec3 aeth_entityInfoTCS[];",
