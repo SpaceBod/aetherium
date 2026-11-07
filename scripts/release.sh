@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Publishes a GitHub release of the version in gradle.properties: builds both loader jars, takes the release notes from
 # that version's section of CHANGELOG.md, and creates the release (and its tag, v<version>) with the jars attached.
+# Publishing it (straight away, or later for a draft) uploads the jars to CurseForge (.github/workflows/curseforge.yml).
 #
 #   bash scripts/release.sh             build and publish
 #   bash scripts/release.sh --draft     publish as a draft, to review on GitHub before it goes out
