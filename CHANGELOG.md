@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-08
+
+A compatibility release: block outlines, hitboxes and chunk borders with Mellow and BSL, glowing end crystals with
+Complementary and Euphoria Patches, and a round of shader pack fixes from contributors (Alpha Piscium, IterationRP,
+SEUS, Rethinking Voxels and more).
+
 ### Fixed
 
 - Block outlines, entity hitboxes and chunk borders show with packs that have no `gbuffers_line` program and draw
@@ -13,17 +19,32 @@ and versions follow [Semantic Versioning](https://semver.org).
 - Entity, block-entity and item ids above 32767 from a pack's id maps reached the shaders as negative numbers, so
   anything a pack keys on them did nothing: end crystals and iron golem eyes did not glow with Complementary and
   Euphoria Patches, whose entity ids start at 50000. Ids now carry their full 16-bit range, up to 65535.
+- Compute shaders are included when checking which depth textures a pack reads. Opaque shadow and no-hand depth
+  copies are no longer skipped for compute-only readers, restoring sunlight and light shafts in Alpha Piscium.
+- Full-screen shaders accept explicit position and UV inputs alongside legacy built-ins, restoring IterationRP's
+  post-processing instead of leaving those inputs unbound.
+- Store-only compute programs with compatible normalized image declarations use the floating-point target's
+  format, preserving numeric values and preventing IterationRP's white screen.
+- Shadow colour textures used only as compute images are allocated even without render attachments, restoring
+  Rethinking Voxels' water waves.
+- Default shadow draw buffers include shadowcolor1 only when the fragment shader exposes a second output,
+  retaining SEUS's voxel lighting without reserving an unused target.
+- Geometry stage inputs and outputs use separate location ranges, avoiding excessive geometry output locations
+  and device loss with SEUS PTGI HRR 3. Integer varyings carry matching flat interpolation in every stage.
+- Alternating anisotropic terrain and ordinary entity draws reuse their albedo samplers instead of accumulating
+  retired Vulkan samplers until a pack unloads, preventing sampler exhaustion with anisotropic texture filtering.
+- Copies of vanilla render pipelines made by cosmetic mods retain their shader-pack entity and shadow programs,
+  preventing Essential's translucent cosmetics from falling back to unencoded vanilla output. Unmatched pipeline
+  lookups are cached instead of scanning the registered pipelines on every draw.
+
+### Also fixed
+
 - The active shader-pack choice is cached instead of reading and parsing the config during terrain mesh checks on
   every frame, including while shaders are off. Saved changes update it immediately; opening the pack screen or
   explicitly reloading picks up external config edits. A malformed config is reported once instead of on every frame.
 - Compute programs that run at the start of a frame or of the shadow pass (`setup` and `shadow`) see that frame's
   camera and shadow matrices and custom uniforms instead of the previous frame's. With the shadow cache on, a frame
   whose shadow compute reads the shadow matrices no longer keeps the previous light angle in them for the whole frame.
-- Alternating anisotropic terrain and ordinary entity draws reuse their albedo samplers instead of accumulating
-  retired Vulkan samplers until a pack unloads, preventing sampler exhaustion with anisotropic texture filtering.
-- Copies of vanilla render pipelines made by cosmetic mods retain their shader-pack entity and shadow programs,
-  preventing Essential's translucent cosmetics from falling back to unencoded vanilla output. Unmatched pipeline
-  lookups are cached instead of scanning the registered pipelines on every draw.
 - Polytone uses vanilla leads while a shader pack is active, matching its Iris fallback and preventing rainbow leads
   with packs that encode their material buffers. Its textured leads still work without a shader pack.
 - Shader interface blocks are split into individual varyings before Minecraft builds Vulkan pipelines, preventing
@@ -34,8 +55,6 @@ and versions follow [Semantic Versioning](https://semver.org).
   allowing Iteration's water program to build.
 - Texture samplers are renamed according to local scope, including reads in a local variable's initializer;
   Iteration's water, shadow and weather shaders no longer fail when their sampled colour is also named `tex`.
-- Geometry stage inputs and outputs use separate location ranges, avoiding excessive geometry output locations
-  and device loss with SEUS PTGI HRR 3. Integer varyings carry matching flat interpolation in every stage.
 - Empty world fragment placeholders no longer reserve a colour target, preserving all eight real world targets in
   Alpha Piscium and Bliss. Full-screen placeholders keep their primary target for safe render-pass sizing.
   Inactive Distant Horizons programs do not reserve world targets.
@@ -47,21 +66,11 @@ and versions follow [Semantic Versioning](https://semver.org).
 - Compatible target image formats use views of the same storage, including Alpha Piscium's RGBA8 clears of
   R32UI targets. Mutable formats are enabled only for targets a compute program accesses through a different
   compatible format. Invalid vector constants emitted by the shader optimizer trigger an unoptimized recompile.
-- Full-screen shaders accept explicit position and UV inputs alongside legacy built-ins, restoring IterationRP's
-  post-processing instead of leaving those inputs unbound.
-- Store-only compute programs with compatible normalized image declarations use the floating-point target's
-  format, preserving numeric values and preventing IterationRP's white screen.
 - Integer and boolean uniform providers convert to float when a pack declares a floating-point flag.
 - Custom uniform expressions support vector/scalar multiplication in either order, restoring MakeUp's TAA correction.
 - Iteration's End shaders accept matrix transpose and inverse expressions in their global initializers.
-- Compute shaders are included when checking which depth textures a pack reads. Opaque shadow and no-hand depth
-  copies are no longer skipped for compute-only readers, restoring sunlight and light shafts in Alpha Piscium.
 - Vulkan pass barriers include geometry, tessellation and early depth-test accesses, keeping shader storage and
   depth writes visible to later passes.
-- Default shadow draw buffers include shadowcolor1 only when the fragment shader exposes a second output,
-  retaining SEUS's voxel lighting without reserving an unused target.
-- Shadow colour textures used only as compute images are allocated even without render attachments, restoring
-  Rethinking Voxels' water waves.
 
 ## [0.1.1] - 2026-10-18
 
@@ -132,6 +141,7 @@ API.
   **Shader Packs...**.
 - A prompt to switch the game to Vulkan when it starts on OpenGL.
 
-[Unreleased]: https://github.com/SpaceBod/aetherium/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/SpaceBod/aetherium/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/SpaceBod/aetherium/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/SpaceBod/aetherium/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/SpaceBod/aetherium/releases/tag/v0.1.0
