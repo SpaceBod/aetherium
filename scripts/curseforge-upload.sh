@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Uploads a GitHub release's jars to the CurseForge project, one file per loader, as the release was published:
-# display name = the jar's file name, game versions = the Minecraft version in the jar name plus its loader,
+# display name = the jar's file name, game versions = the Minecraft version in the jar name, its loader and the
+# Client environment (Aetherium is client-side; CurseForge needs an environment on every file),
 # changelog = the release notes from their first "###" heading on (markdown), release type = release.
 #
 #   bash scripts/curseforge-upload.sh v0.1.2             upload
@@ -66,7 +67,7 @@ print(json.dumps({
     "changelog": open(changelog, encoding="utf-8").read(),
     "changelogType": "markdown",
     "displayName": name,
-    "gameVersionNames": [minecraft, loader],
+    "gameVersionNames": [minecraft, loader, "Client"],
     "releaseType": "release",
 }))
 EOF
