@@ -5,13 +5,15 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-10
+
+A patch release: the block-breaking crack shows with Photon 1.4.
+
 ### Fixed
 
-- The block-breaking crack shows with Photon 1.4 ([#23](https://github.com/SpaceBod/aetherium/issues/23)). Its
-  `gbuffers_damagedblock` leaves a mark in colortex3 for its deferred pass to read, but the crack was drawn after the
-  deferred passes. The crack now goes after them only for packs whose `gbuffers_damagedblock` draws into colortex0
-  (Photon 1.3b, Complementary, BSL); other packs get it with the solid blocks, before the deferred passes, on glass
-  and other translucent blocks too. It still casts no shadow.
+- The block-breaking crack shows with Photon 1.4, on solid blocks and on glass
+  ([#23](https://github.com/SpaceBod/aetherium/issues/23)).
+- Photon 1.3b, Complementary and BSL keep drawing their crack as before.
 
 ## [0.1.2] - 2026-11-08
 
@@ -149,7 +151,8 @@ API.
   **Shader Packs...**.
 - A prompt to switch the game to Vulkan when it starts on OpenGL.
 
-[Unreleased]: https://github.com/SpaceBod/aetherium/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/SpaceBod/aetherium/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/SpaceBod/aetherium/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/SpaceBod/aetherium/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/SpaceBod/aetherium/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/SpaceBod/aetherium/releases/tag/v0.1.0
