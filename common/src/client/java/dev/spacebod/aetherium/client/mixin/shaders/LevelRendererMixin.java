@@ -86,7 +86,7 @@ abstract class LevelRendererMixin {
 		aetherium$shaderFeatures = features;
 	}
 
-	/** The block-breaking cracks go to the breaking overlay, drawn after the deferred passes ({@link CrackRouting}). */
+	/** The block-breaking cracks go to the breaking overlay, drawn after the deferred passes, when the pack wants them there ({@link CrackRouting}). */
 	@WrapMethod(method = "submitBlockDestroyAnimation")
 	private void aetherium$cracksAfterDeferred(PoseStack poseStack, SubmitNodeCollector collector, LevelRenderState state, Operation<Void> original) {
 		CrackRouting.submitting(true);

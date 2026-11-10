@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Fixed
+
+- The block-breaking crack shows with Photon 1.4 ([#23](https://github.com/SpaceBod/aetherium/issues/23)). Its
+  `gbuffers_damagedblock` leaves a mark in colortex3 for its deferred pass to read, but the crack was drawn after the
+  deferred passes. The crack now goes after them only for packs whose `gbuffers_damagedblock` draws into colortex0
+  (Photon 1.3b, Complementary, BSL); other packs get it with the solid blocks, before the deferred passes, on glass
+  and other translucent blocks too. It still casts no shadow.
+
 ## [0.1.2] - 2026-11-08
 
 A compatibility release: block outlines, hitboxes and chunk borders with Mellow and BSL, glowing end crystals with

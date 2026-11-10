@@ -10,22 +10,30 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Aetherium Shaders: a block crack submitted to a solid phase goes to its collection's breaking overlay ({@link CrackRouting}). */
+/**
+ * Aetherium Shaders: a block crack submitted to a collection's solid phase or breaking overlay goes to the one of the two
+ * the pack wants its cracks in ({@link CrackRouting}).
+ */
 @Mixin(SimpleFeatureRenderPhase.class)
-abstract class CrackRouteMixin implements CrackRouting.SolidPhase {
+abstract class CrackRouteMixin implements CrackRouting.CrackPhase {
+	@Unique
+	private @Nullable SimpleFeatureRenderPhase aetherium$solid;
 	@Unique
 	private @Nullable SimpleFeatureRenderPhase aetherium$breakingOverlay;
 
 	@Override
-	public void aetherium$linkBreakingOverlay(SimpleFeatureRenderPhase breakingOverlay) {
+	public void aetherium$linkCrackPhases(SimpleFeatureRenderPhase solid, SimpleFeatureRenderPhase breakingOverlay) {
+		aetherium$solid = solid;
 		aetherium$breakingOverlay = breakingOverlay;
 	}
 
 	@Inject(method = "submit", at = @At("HEAD"), cancellable = true)
-	private void aetherium$crackAfterDeferred(SubmitNode submit, CallbackInfo ci) {
+	private void aetherium$routeCrack(SubmitNode submit, CallbackInfo ci) {
+		SimpleFeatureRenderPhase solid = aetherium$solid;
 		SimpleFeatureRenderPhase overlay = aetherium$breakingOverlay;
-		if (overlay != null && overlay != (Object) this && CrackRouting.redirect()) {
-			overlay.submit(submit);
+		SimpleFeatureRenderPhase target = solid == null || overlay == null ? null : CrackRouting.target(solid, overlay);
+		if (target != null && target != (Object) this) {
+			target.submit(submit);
 			ci.cancel();
 		}
 	}

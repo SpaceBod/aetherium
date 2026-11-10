@@ -345,6 +345,14 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 		return state != State.ACTIVE || occlusionCulling;
 	}
 
+	/** Whether the active pack's block-breaking crack is drawn after its deferred passes ({@link CrackRouting}). */
+	private boolean cracksAfterDeferred = true;
+
+	/** True when a pack runs and wants its crack after the deferred passes, with the breaking overlay ({@link CrackRouting}). */
+	public boolean cracksAfterDeferred() {
+		return state == State.ACTIVE && cracksAfterDeferred;
+	}
+
 	/** True while a pack is drawing the world (mixins use it to change vanilla's behaviour only then). */
 	public boolean worldActive() {
 		return state == State.ACTIVE && worldActive;
@@ -879,8 +887,9 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 				return worldPrograms.skip(vanilla);
 			}
 			PipelinePrograms.Context c = blockEntityDraw && !context.hand() ? PipelinePrograms.Context.BLOCK_ENTITY : context;
-			if (shadowPassOpen && featureDraw && shadowSkips()) {
-				// shadowEntities / shadowBlockEntities = false: the draw goes through a pipeline that draws nothing.
+			if (shadowPassOpen && (featureDraw && shadowSkips() || vanilla == RenderPipelines.CRUMBLING)) {
+				// shadowEntities / shadowBlockEntities = false, or the block-breaking crack (it casts no shadow; it is replayed
+				// with the solid blocks when the pack keeps it there, CrackRouting): a pipeline that draws nothing.
 				return shadowPrograms.skip(vanilla);
 			}
 			if (gbufferPassOpen && (featureFlags & DrawIds.SHADOW_ONLY) != 0) {
@@ -910,7 +919,7 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 				return worldPrograms.skip(vanilla);
 			}
 			PipelinePrograms.Context c = blockEntityDraw && !context.hand() ? PipelinePrograms.Context.BLOCK_ENTITY : context;
-			if (shadowPassOpen && featureDraw && shadowSkips()) {
+			if (shadowPassOpen && (featureDraw && shadowSkips() || vanilla == RenderPipelines.CRUMBLING)) {
 				return shadowPrograms.skip(vanilla);
 			}
 			if (gbufferPassOpen && (featureFlags & DrawIds.SHADOW_ONLY) != 0) {
@@ -2316,6 +2325,9 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 		});
 		AetheriumShaders.logger.info("buffers kept across frames (clear = false):{}", kept.length() == 0 ? " none" : kept);
 		worldPrograms = new WorldPrograms(programs, layout, customUniforms, false);
+		cracksAfterDeferred = CrackRouting.afterDeferred(programs);
+		AetheriumShaders.logger.info("block-breaking crack drawn {}", cracksAfterDeferred
+				? "after the deferred passes" : "with the solid blocks, before the deferred passes (gbuffers_damagedblock draws no colortex0)");
 		packHasLodPrograms = programs.get(ProgramId.DhTerrain).isPresent() || programs.get(ProgramId.DhWater).isPresent();
 		packHasLodShadow = packHasLodPrograms && programs.get(ProgramId.DhShadow).isPresent()
 				&& directives.getShadowDirectives().isDhShadowEnabled().orElse(true);
@@ -2650,6 +2662,7 @@ public final class ShaderPackEngine implements ShadowFrame.Passes {
 		frustumCulling = true;
 		occlusionCulling = true;
 		skipAllRendering = false;
+		cracksAfterDeferred = true;
 		ShadowMatrices.endFlashSupported = false;
 		worldActive = false;
 		EntityVertexFormats.setActive(false);
