@@ -26,6 +26,8 @@ import net.minecraft.world.phys.AABB;
  * ({@code screenshots/doc-*.png}): the Options screen, the Shaders settings page, the shader pack screen with a
  * changed option, the Vulkan prompt, the zoom readout on a mob, and the loading indicator. Then the game quits.
  * Starts once the pack is active; each step waits {@link #STEP_SECONDS} for the screen to settle before its shot.
+ * With {@code AETHERIUM_DOC_SHOTS=review} (for checking a translation) it also shoots every page of the settings screen
+ * and leaves the game running at the end.
  */
 final class DocShots {
 	private static final double STEP_SECONDS = 2.5;
@@ -35,12 +37,24 @@ final class DocShots {
 	}
 
 	private final List<Step> steps = new ArrayList<>();
+	/** Every settings page is shot and the game keeps running afterwards. */
+	private final boolean review;
 	private int index = -1;
 	private double stepStart;
 	private boolean done;
 
-	DocShots() {
+	DocShots(boolean review) {
+		this.review = review;
 		steps.add(new Step(mc -> mc.gui.setScreen(new OptionsScreen(null, mc.options)), "options"));
+		if (review) {
+			for (int page : new int[] {0, 2, 3}) {
+				steps.add(new Step(mc -> {
+					AetheriumSettingsScreen settings = new AetheriumSettingsScreen(null);
+					mc.gui.setScreen(settings);
+					settings.showPage(page);
+				}, "settings-" + page));
+			}
+		}
 		// The Shaders page (the second) of the settings screen.
 		steps.add(new Step(mc -> {
 			AetheriumSettingsScreen settings = new AetheriumSettingsScreen(null);
@@ -103,7 +117,9 @@ final class DocShots {
 		if (index + 1 >= steps.size()) {
 			done = true;
 			Aetherium.LOG.info("Doc shots: done");
-			mc.stop();
+			if (!review) {
+				mc.stop();
+			}
 			return true;
 		}
 		next(mc, seconds);
