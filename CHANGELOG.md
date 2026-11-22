@@ -5,6 +5,19 @@ and versions follow [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Added
+
+- Translations: Simplified Chinese, Traditional Chinese, Japanese, Korean, Russian, Ukrainian, German, French,
+  Spanish, Brazilian Portuguese, Italian and Polish ([#25](https://github.com/SpaceBod/aetherium/issues/25)).
+  They follow the game's language setting.
+- The mod's description in the mods list is translated too (Fabric's Mod Menu and NeoForge's Mods screen).
+- `scripts/check_lang.py` checks every language file against `en_us.json`: same keys, same placeholders.
+
+### Changed
+
+- The Aetherium settings screen and the zoom readout take all of their text from the language files; before, it
+  was written into the code in English, so it could not be translated.
+
 ## [0.1.3] - 2026-11-10
 
 A patch release: the block-breaking crack shows with Photon 1.4.

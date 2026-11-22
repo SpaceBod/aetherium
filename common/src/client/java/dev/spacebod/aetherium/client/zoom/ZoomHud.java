@@ -1,6 +1,7 @@
 package dev.spacebod.aetherium.client.zoom;
 
 import com.google.gson.JsonPrimitive;
+import dev.spacebod.aetherium.client.gui.Lang;
 import dev.spacebod.aetherium.shaders.config.ShaderPackSettings;
 import dev.spacebod.aetherium.shaders.gui.Theme;
 import java.util.List;
@@ -35,17 +36,19 @@ import org.jspecify.annotations.Nullable;
 public final class ZoomHud {
 	/** The corner the panels sit in; {@code id} is how the config names it. */
 	public enum Corner {
-		TOP_RIGHT("top_right", "Top right"),
-		TOP_LEFT("top_left", "Top left"),
-		BOTTOM_RIGHT("bottom_right", "Bottom right"),
-		BOTTOM_LEFT("bottom_left", "Bottom left");
+		TOP_RIGHT("top_right"),
+		TOP_LEFT("top_left"),
+		BOTTOM_RIGHT("bottom_right"),
+		BOTTOM_LEFT("bottom_left");
 
 		public final String id;
-		public final String label;
 
-		Corner(String id, String label) {
+		Corner(String id) {
 			this.id = id;
-			this.label = label;
+		}
+
+		public String label() {
+			return Lang.t("aetherium.zoom.corner." + id);
 		}
 
 		boolean right() {
@@ -74,7 +77,7 @@ public final class ZoomHud {
 	/** Gap between the two panels, and between them and the screen edges. */
 	private static final int GAP = 2;
 	/** The eight directions, from the way the camera faces: south at 0 degrees of yaw, west at 90. */
-	private static final String[] DIRECTIONS = {"South", "Southwest", "West", "Northwest", "North", "Northeast", "East", "Southeast"};
+	private static final String[] DIRECTIONS = {"south", "southwest", "west", "northwest", "north", "northeast", "east", "southeast"};
 	/** Type sizes: the coordinates and the name, then the distance row. */
 	private static final float LARGE = 0.75f;
 	private static final float SMALL = 0.5f;
@@ -182,17 +185,17 @@ public final class ZoomHud {
 			// Coordinates over distance and the direction faced. Both rows span the same width, so the left and right edges
 			// line up: X starts and Z ends at the padding, Y sits evenly between, and the distance and direction take the ends
 			// of the row below. The direction's slot fits the longest name, so turning does not resize the panel.
-			String direction = DIRECTIONS[Math.floorMod(Math.round(camera.getViewYRot(partial) / 45.0f), 8)];
+			String direction = Lang.t("aetherium.zoom.direction." + DIRECTIONS[Math.floorMod(Math.round(camera.getViewYRot(partial) / 45.0f), 8)]);
 			int directionSlot = 0;
 			for (String d : DIRECTIONS) {
-				directionSlot = Math.max(directionSlot, font.width(d));
+				directionSlot = Math.max(directionSlot, font.width(Lang.t("aetherium.zoom.direction." + d)));
 			}
 			String distance;
 			if (target == null) {
-				distance = "Nothing in range";
+				distance = Lang.t("aetherium.zoom.nothing_in_range");
 			} else {
 				long blocks = Math.round(target.distance());
-				distance = blocks + (blocks == 1 ? " block" : " blocks");
+				distance = Lang.plural("aetherium.zoom.distance", blocks);
 			}
 			float inner = (font.width(distance) + 12 + directionSlot) * SMALL;
 			float[] axes = null;

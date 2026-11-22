@@ -100,7 +100,8 @@ public final class BenchDriver {
 	private boolean settleAtEnd;
 	private int lastLoadedChunks = -1;
 	/** {@code AETHERIUM_DOC_SHOTS} set: the documentation screenshot tour, run in play mode. */
-	private final @Nullable DocShots docShots = System.getenv("AETHERIUM_DOC_SHOTS") != null ? new DocShots() : null;
+	private final @Nullable DocShots docShots = System.getenv("AETHERIUM_DOC_SHOTS") != null
+			? new DocShots("review".equals(System.getenv("AETHERIUM_DOC_SHOTS"))) : null;
 	private int lastVisibleSections = -1;
 	private double joinSeconds = -1;
 	private double settledSeconds = -1;

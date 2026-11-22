@@ -43,6 +43,8 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 	private static final int GAP = 3;
 	private static final int HEADER = 18;
 	private static int lastPage;
+	/** Starts the banner that lists settings waiting for a restart. */
+	private static final String RESTART_MARK = "⟳ ";
 
 	private final @Nullable Screen parent;
 	private final SettingsCatalog catalog;
@@ -81,7 +83,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 	private int sideX1;
 
 	public AetheriumSettingsScreen(@Nullable Screen parent) {
-		super(Component.literal("Aetherium Settings"));
+		super(Component.translatable("aetherium.settings.title"));
 		this.parent = parent;
 		this.catalog = new SettingsCatalog(this);
 		this.pages = catalog.pages();
@@ -91,10 +93,10 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 	@Override
 	protected void init() {
 		String query = search == null ? "" : search.getValue();
-		search = new EditBox(minecraft.font, 0, 0, 120, 14, Component.literal("Search settings"));
+		search = new EditBox(minecraft.font, 0, 0, 120, 14, Component.translatable("aetherium.settings.search"));
 		search.setBordered(false);
 		search.setMaxLength(64);
-		search.setHint(Component.literal("Search settings…").withStyle(s -> s.withColor(Theme.TEXT_MUTED)));
+		search.setHint(Component.translatable("aetherium.settings.search_hint").withStyle(s -> s.withColor(Theme.TEXT_MUTED)));
 		search.setValue(query);
 		search.setResponder(q -> scroll = 0);
 		addRenderableWidget(search);
@@ -167,7 +169,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		g.pose().pushMatrix();
 		g.pose().scale(ui, ui);
 		if (peek) {
-			String hint = Theme.fit(font, "Previewing — release Tab to return", vw - 40);
+			String hint = Theme.fit(font, t("previewing"), vw - 40);
 			int w = font.width(hint) + 20;
 			Theme.round(g, (vw - w) / 2, vh - 30, (vw + w) / 2, vh - 12, Theme.PANEL);
 			g.centeredText(font, hint, vw / 2, vh - 25, Theme.TEXT_DIM);
@@ -194,7 +196,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		}
 		g.text(font, Theme.fit(font, "Aetherium", inner), 0, 0, Theme.TEXT, false);
 		g.pose().popMatrix();
-		g.text(font, "Settings", x0 + 12, y0 + 27, Theme.ACCENT_TEXT, false);
+		g.text(font, Theme.fit(font, t("sidebar_subtitle"), inner), x0 + 12, y0 + 27, Theme.ACCENT_TEXT, false);
 
 		boolean searching = searching();
 		int y = y0 + 46;
@@ -225,7 +227,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 			int index = i;
 			hotspots.add(new Hotspot(x0 + 6, cy0, x1 - 6, cy1, () -> selectPage(index), null, null, null));
 		}
-		String footer = "Running on " + (VulkanAccess.device() != null ? "Vulkan" : "OpenGL");
+		String footer = t("running_on", VulkanAccess.device() != null ? "Vulkan" : "OpenGL");
 		g.text(font, Theme.fit(font, footer, x1 - x0 - 24), x0 + 12, y1 - 16, Theme.TEXT_MUTED, false);
 	}
 
@@ -237,8 +239,8 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		int searchWidth = wide ? Math.min(180, inner / 3) : inner;
 		int titleWidth = wide ? inner - searchWidth - pad : inner;
 		Setting.Page p = pages.get(page);
-		String title = searching() ? "Search" : p.title();
-		String subtitle = searching() ? resultCount() + " matching settings" : p.subtitle();
+		String title = searching() ? t("search_title") : p.title();
+		String subtitle = searching() ? Lang.plural("aetherium.settings.search_results", resultCount()) : p.subtitle();
 		boolean bigTitle = font.width(title) * 1.25f <= titleWidth;
 		g.pose().pushMatrix();
 		g.pose().translate(x0 + pad, y0 + 11);
@@ -306,7 +308,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		}
 		g.disableScissor();
 		if (lines.isEmpty()) {
-			g.text(font, "Nothing matches “" + search.getValue().trim() + "”", x0 + 4, y0 + 8, Theme.TEXT_MUTED, false);
+			g.text(font, Theme.fit(font, t("nothing_matches", search.getValue().trim()), x1 - x0 - 8), x0 + 4, y0 + 8, Theme.TEXT_MUTED, false);
 		}
 		double view = y1 - y0;
 		if (contentHeight > view) {
@@ -431,8 +433,8 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		Setting<?> s = hovered;
 		if (s == null) {
 			String help = searching()
-					? "Results from every page. Esc clears the search."
-					: "Click to change · right-click or Shift+scroll to go back · middle-click resets · Enter applies · hold Tab to look at the world";
+					? t("help_search")
+					: t("help");
 			List<String> lines = Theme.wrap(font, help, x1 - x0 - 16, Math.max(1, (y1 - y0 - 8) / 10));
 			int ty = y0 + (y1 - y0 - lines.size() * 10) / 2 + 1;
 			for (String line : lines) {
@@ -447,7 +449,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		int tx = x0 + 14 + nameWidth;
 		List<Setting.Tag> tags = new ArrayList<>(s.tags());
 		if (s.unavailableReason() != null) {
-			tags.add(0, new Setting.Tag("Unavailable", Theme.BAD));
+			tags.add(0, Setting.Tag.UNAVAILABLE);
 		}
 		for (Setting.Tag tag : tags) {
 			int w = font.width(tag.label()) + 8;
@@ -477,15 +479,15 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		}
 		StringBuilder b = new StringBuilder();
 		Object value = value(s);
-		b.append("Value: ").append(s.label(value));
+		b.append(t("meta.value", s.label(value)));
 		Object def = s.defaultValue();
 		if (def != null) {
-			b.append("  ·  Default: ").append(s.label(def));
+			b.append("  ·  ").append(t("meta.default", s.label(def)));
 		}
 		if (pending.containsKey(s)) {
-			b.append("  ·  Not applied yet (now ").append(s.label(s.applied())).append(')');
+			b.append("  ·  ").append(t("meta.not_applied", s.label(s.applied())));
 		} else if (s.restartPending()) {
-			b.append("  ·  Restart the game to apply");
+			b.append("  ·  ").append(t("meta.restart"));
 		}
 		return b.toString();
 	}
@@ -493,18 +495,18 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 	private void drawFooter(GuiGraphicsExtractor g, Font font, int x0, int y0, int x1, int y1, int mx, int my) {
 		int count = pending.size();
 		int bx = x1;
-		bx = footerButton(g, font, bx, y0, y1, "Done", true, mx, my, this::onClose);
-		bx = footerButton(g, font, bx, y0, y1, "Apply", count > 0, mx, my, this::apply);
+		bx = footerButton(g, font, bx, y0, y1, t("button.done"), true, mx, my, this::onClose);
+		bx = footerButton(g, font, bx, y0, y1, t("button.apply"), count > 0, mx, my, this::apply);
 		if (count > 0) {
-			bx = footerButton(g, font, bx, y0, y1, "Undo", false, mx, my, () -> {
+			bx = footerButton(g, font, bx, y0, y1, t("button.undo"), false, mx, my, () -> {
 				pending.clear();
-				showToast("Changes discarded", Theme.TEXT_DIM);
+				showToast(t("toast.discarded"), Theme.TEXT_DIM);
 			});
 		}
 		if (!searching()) {
-			bx = footerButton(g, font, bx, y0, y1, "Reset page", false, mx, my, this::resetPage);
+			bx = footerButton(g, font, bx, y0, y1, t("button.reset_page"), false, mx, my, this::resetPage);
 		}
-		String left = count > 0 ? count + " change" + (count == 1 ? "" : "s") + " not applied" : "Up to date";
+		String left = count > 0 ? Lang.plural("aetherium.settings.footer.not_applied", count) : t("footer.up_to_date");
 		if (bx - x0 - 8 > font.width("…") + 4) {
 			g.text(font, Theme.fit(font, left, bx - x0 - 8), x0, y0 + 7, count > 0 ? Theme.ACCENT_TEXT : Theme.TEXT_MUTED, false);
 		}
@@ -625,10 +627,10 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 			}
 		}
 		if (!restart.isEmpty()) {
-			banners.add("⟳ Restart the game to finish applying: " + String.join(", ", restart));
+			banners.add(RESTART_MARK + t("banner.restart", String.join(", ", restart)));
 		}
 		if (VulkanAccess.device() == null) {
-			banners.add("Running on OpenGL: shader packs and GPU optimisations need Vulkan (Video Settings › Graphics API).");
+			banners.add(t("banner.opengl"));
 		}
 		return banners;
 	}
@@ -660,7 +662,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 				}
 			}
 		}
-		showToast(n == 0 ? "Everything on this page is at its default" : n + " setting" + (n == 1 ? "" : "s") + " reset · Apply to keep",
+		showToast(n == 0 ? t("toast.page_at_default") : Lang.plural("aetherium.settings.toast.page_reset", n),
 				n == 0 ? Theme.TEXT_DIM : Theme.ACCENT_TEXT);
 	}
 
@@ -680,8 +682,8 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		List<Map.Entry<Setting<?>, Object>> changes = new ArrayList<>(pending.entrySet());
 		pending.clear();
 		int done = commit(changes);
-		boolean restart = banners().stream().anyMatch(b -> b.startsWith("⟳"));
-		showToast("Applied " + done + " change" + (done == 1 ? "" : "s") + (restart ? " · some need a restart" : ""), restart ? Theme.WARN : Theme.GOOD);
+		boolean restart = banners().stream().anyMatch(b -> b.startsWith(RESTART_MARK));
+		showToast(Lang.plural("aetherium.settings.toast.applied", done) + (restart ? t("toast.applied_restart") : ""), restart ? Theme.WARN : Theme.GOOD);
 	}
 
 	/** Commits in each setting's order, runs the shared after-apply steps once, saves both option files. */
@@ -712,7 +714,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		}
 		catalog.store.saveIfDirty();
 		if (!failed.isEmpty()) {
-			showToast("Could not apply " + String.join(", ", failed.values()) + " · details in the log", Theme.BAD);
+			showToast(t("toast.apply_failed", String.join(", ", failed.values())), Theme.BAD);
 		}
 		return done;
 	}
@@ -825,7 +827,7 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		}
 		if (ctrl && key == InputConstants.KEY_Z && !search.isFocused()) {
 			pending.clear();
-			showToast("Changes discarded", Theme.TEXT_DIM);
+			showToast(t("toast.discarded"), Theme.TEXT_DIM);
 			return true;
 		}
 		if (ctrl && key == InputConstants.KEY_S || key == InputConstants.KEY_RETURN && !search.isFocused()) {
@@ -858,6 +860,11 @@ public final class AetheriumSettingsScreen extends Screen implements SettingsCat
 		// Closing keeps the edits, as vanilla's options screens do.
 		apply();
 		minecraft.gui.setScreen(parent);
+	}
+
+	/** {@code aetherium.settings.<key>} in the current language. */
+	private static String t(String key, Object... args) {
+		return Lang.t("aetherium.settings." + key, args);
 	}
 
 	private static double clampScroll(double scroll, double content, double view) {

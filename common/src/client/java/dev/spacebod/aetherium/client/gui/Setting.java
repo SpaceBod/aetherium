@@ -1,5 +1,6 @@
 package dev.spacebod.aetherium.client.gui;
 
+import dev.spacebod.aetherium.shaders.gui.Theme;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -26,17 +27,22 @@ public final class Setting<T> {
 		TOGGLE, CHOICE, SLIDER, ACTION, INFO
 	}
 
-	/** A small label shown with the description (e.g. "Restart", "Lossless"). */
-	public record Tag(String label, int color) {
-		public static final Tag INSTANT = new Tag("Applies instantly", 0xFF5BD69B);
-		public static final Tag RESTART = new Tag("Needs restart", 0xFFF2B35B);
-		public static final Tag LOSSLESS = new Tag("Lossless", 0xFFB8AEFF);
-		public static final Tag NEAR_LOSSLESS = new Tag("Near-lossless", 0xFFB8AEFF);
-		public static final Tag EXPERIMENTAL = new Tag("Experimental", 0xFFFF8A6B);
-		public static final Tag VULKAN = new Tag("Vulkan", 0xFF7FB5FF);
-		public static final Tag SPEEDS_UP_CPU = new Tag("Saves CPU", 0xFF5BD69B);
-		public static final Tag SPEEDS_UP_GPU = new Tag("Saves GPU", 0xFF5BD69B);
-		public static final Tag SAVES_MEMORY = new Tag("Saves memory", 0xFF5BD69B);
+	/** A small label shown with the description (e.g. "Restart", "Lossless"); {@code id} names its text in the language files. */
+	public record Tag(String id, int color) {
+		public static final Tag INSTANT = new Tag("instant", 0xFF5BD69B);
+		public static final Tag RESTART = new Tag("restart", 0xFFF2B35B);
+		public static final Tag LOSSLESS = new Tag("lossless", 0xFFB8AEFF);
+		public static final Tag NEAR_LOSSLESS = new Tag("near_lossless", 0xFFB8AEFF);
+		public static final Tag EXPERIMENTAL = new Tag("experimental", 0xFFFF8A6B);
+		public static final Tag VULKAN = new Tag("vulkan", 0xFF7FB5FF);
+		public static final Tag SPEEDS_UP_CPU = new Tag("saves_cpu", 0xFF5BD69B);
+		public static final Tag SPEEDS_UP_GPU = new Tag("saves_gpu", 0xFF5BD69B);
+		public static final Tag SAVES_MEMORY = new Tag("saves_memory", 0xFF5BD69B);
+		public static final Tag UNAVAILABLE = new Tag("unavailable", Theme.BAD);
+
+		public String label() {
+			return Lang.t("aetherium.settings.tag." + id);
+		}
 	}
 
 	public final String id;
@@ -75,7 +81,7 @@ public final class Setting<T> {
 
 	public static Setting<Boolean> toggle(String id, String name, String description, Supplier<Boolean> get, Consumer<Boolean> set) {
 		Setting<Boolean> s = new Setting<>(id, name, description, Kind.TOGGLE, get, set);
-		s.label = on -> on ? "On" : "Off";
+		s.label = on -> Lang.t(on ? "aetherium.settings.value.on" : "aetherium.settings.value.off");
 		s.values = () -> List.of(Boolean.FALSE, Boolean.TRUE);
 		return s;
 	}

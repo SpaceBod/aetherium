@@ -145,6 +145,14 @@ bash benchmarks/tools/build-lod.sh     # once: builds the level-of-detail jars t
 The jars are written to `fabric/build/libs/` and `neoforge/build/libs/`. [Development](docs/development.md) covers dev
 runs, the game-free test harness and benchmarks.
 
+## Translations
+
+Aetherium follows the game's language setting. It ships English, Simplified and Traditional Chinese, Japanese, Korean,
+Russian, Ukrainian, German, French, Spanish, Brazilian Portuguese, Italian and Polish. The files are in
+[`common/src/client/resources/assets/aetherium/lang`](common/src/client/resources/assets/aetherium/lang): to fix a
+translation or add a language, copy `en_us.json` to the game's code for it (for example `nl_nl.json`), translate the
+values, check it with `python scripts/check_lang.py nl_nl` and open a pull request.
+
 ## Credits
 
 Aetherium stands on the work of others. With thanks to:
